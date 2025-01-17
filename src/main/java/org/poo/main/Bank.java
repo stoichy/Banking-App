@@ -21,6 +21,7 @@ public final class Bank {
     private ObjectInput input;
     private int timestamp;
     private List<User> users;
+    private List<List<SplitPayment>> listsOfSplitPayments;
 
     private Bank(final ObjectInput input) {
         setInput(input);
@@ -35,6 +36,7 @@ public final class Bank {
                 user.setPlan("standard");
             }
         }
+        this.listsOfSplitPayments = new ArrayList<>();
     }
 
     public static Bank getInstance(final ObjectInput input) {
@@ -90,11 +92,20 @@ public final class Bank {
     }
 
     //Commission calculator
-    public double commission(User user, double amount) {
+    public double getCommission(Account account, double amount) {
+        User user = searchUserByAccount(account.getNumber());
+        double exchangedAmount = amount;
+        if (user == null) {
+            return amount;
+        }
+
+        if (!account.getCurrency().equals("RON")) {
+            exchangedAmount = exchange("RON", account.getCurrency(), amount);
+        }
         if (user.getPlan().equals("standard")) {
             amount = amount * 1.002;
         }
-        if (user.getPlan().equals("silver") && amount >= 500) {
+        if (user.getPlan().equals("silver") && exchangedAmount >= 500) {
             amount = amount * 1.001;
         }
         return amount;
@@ -102,122 +113,135 @@ public final class Bank {
 
     public double getCashback(final Account account) {
         ArrayNode transactions = account.getTransactions();
-        JsonNode lastTransaction = transactions.
-                get(transactions.size() - 1);
+        JsonNode lastTransaction = transactions.get(transactions.size() - 1);
+        String amount = lastTransaction.get("amount").asText();
 
+        CommerciantInput lastCommerciant = null;
         if (lastTransaction.get("commerciant") != null) {
-            CommerciantInput lastCommerciant = searchCommerciant
-                    (lastTransaction.get("commerciant").asText());
-            if (lastCommerciant == null) {
-                return 0;
-            }
-            return getCashbackNrOfTransactions(account, lastCommerciant, lastTransaction.get("amount").asText()) +
-                    getCashbackSpendingThreshold(account, lastCommerciant, lastTransaction.get("amount").asText());
+            lastCommerciant = searchCommerciant(lastTransaction.get("commerciant").asText());
+        } else if (lastTransaction.get("receiverIBAN") != null) {
+            lastCommerciant = searchCommerciantAccount(lastTransaction.get("receiverIBAN").asText());
         }
-        return 0;
-    }
-
-    public double getCashbackSpendingThreshold
-            (final Account account, final CommerciantInput lastCommerciant, final String amount) {
-        User user = searchUserByAccount(account.getNumber());
-
-        if (!lastCommerciant.getCashbackStrategy().equals("spendingThreshold")) {
+        if (lastCommerciant == null) {
             return 0;
         }
 
+        if (!"spendingThreshold".equals(lastCommerciant.getCashbackStrategy())) {
+            return getCashbackNrOfTransactions(account, lastCommerciant, amount);
+        } else {
+            return getCashbackSpendingThreshold(account, lastCommerciant, amount);
+        }
+    }
+
+    public double getCashbackSpendingThreshold(Account account, CommerciantInput lastCommerciant, String amount) {
+        User user = searchUserByAccount(account.getNumber());
         if (user == null) {
             return 0;
         }
+        double doubleAmount = Double.parseDouble(amount.split(" ")[0]);
+        double exchangedAmount = exchange("RON", account.getCurrency(), Double.parseDouble(amount.split(" ")[0]));
+        account.setSpendingThreshold(account.getSpendingThreshold() + exchangedAmount);
 
-        account.setSpendingThreshold100(account.getSpendingThreshold100() + Double.parseDouble(amount));
-        account.setSpendingThreshold300(account.getSpendingThreshold300() + Double.parseDouble(amount));
-        account.setSpendingThreshold500(account.getSpendingThreshold500() + Double.parseDouble(amount));
+        double spendingThreshold = account.getSpendingThreshold();
+        String plan = user.getPlan();
+        double cashback = 0;
 
-        if (user.getPlan().equals("standard") || user.getPlan().equals("student")) {
-            if (account.getSpendingThreshold500() >= 500) {
-                return Double.parseDouble(amount) * 0.0025;
-            }
-            if (account.getSpendingThreshold300() >= 300) {
-                return Double.parseDouble(amount) * 0.002;
-            }
-            if (account.getSpendingThreshold100() >= 100) {
-                return Double.parseDouble(amount) * 0.001;
-            }
+        if ("standard".equals(plan) || "student".equals(plan)) {
+            cashback = getStandardOrStudentCashback(spendingThreshold, doubleAmount);
+        } else if ("silver".equals(plan)) {
+            cashback = getSilverCashback(spendingThreshold, doubleAmount);
+        } else if ("gold".equals(plan)) {
+            cashback = getGoldCashback(spendingThreshold, doubleAmount);
         }
-        if (user.getPlan().equals("silver")) {
-            if (account.getSpendingThreshold500() >= 500) {
-                return Double.parseDouble(amount) * 0.005;
-            }
-            if (account.getSpendingThreshold300() >= 300) {
-                return Double.parseDouble(amount) * 0.004;
-            }
-            if (account.getSpendingThreshold100() >= 100) {
-                return Double.parseDouble(amount) * 0.003;
-            }
+
+        return cashback;
+    }
+
+    //Helper method for getCashbackSpendingThreshold
+    private double getStandardOrStudentCashback(double spendingThreshold, final double amount) {
+        if (spendingThreshold >= 500) {
+            return amount * 0.0025;
+        } else if (spendingThreshold >= 300) {
+            return amount * 0.002;
+        } else if (spendingThreshold >= 100) {
+            return amount * 0.001;
         }
-        if (user.getPlan().equals("gold")) {
-            if (account.getSpendingThreshold500() >= 500) {
-                return Double.parseDouble(amount) * 0.007;
-            }
-            if (account.getSpendingThreshold300() >= 300) {
-                return Double.parseDouble(amount) * 0.0055;
-            }
-            if (account.getSpendingThreshold100() >= 100) {
-                return Double.parseDouble(amount) * 0.005;
-            }
+        return 0;
+    }
+
+    //Helper method for getCashbackSpendingThreshold
+    private double getSilverCashback(double spendingThreshold, final double amount) {
+        if (spendingThreshold >= 500) {
+            return amount * 0.005;
+        } else if (spendingThreshold >= 300) {
+            return amount * 0.004;
+        } else if (spendingThreshold >= 100) {
+            return amount * 0.003;
         }
+        return 0;
+    }
+
+    //Helper method for getCashbackSpendingThreshold
+    private double getGoldCashback(double spendingThreshold, final double amount) {
+        if (spendingThreshold >= 500) {
+            return amount * 0.007;
+        } else if (spendingThreshold >= 300) {
+            return amount * 0.0055;
+        } else if (spendingThreshold >= 100) {
+            return amount * 0.005;
+        }
+        return 0;
+    }
+
+    public double getCashbackNrOfTransactions(final Account account, final CommerciantInput lastCommerciant, final String amount) {
+        double parsedAmount = Double.parseDouble(amount.split(" ")[0]);
+        String commerciantType = lastCommerciant.getType();
+
+        if (applyCashbackForType(account, commerciantType, parsedAmount)) {
+            return cashbackAmount(commerciantType, parsedAmount);
+        }
+
+        updateCashbackBasedOnTransactions(account);
 
         return 0;
     }
 
-    public double getCashbackNrOfTransactions
-            (final Account account, final CommerciantInput lastCommerciant, final String amount) {
-
-        if (!lastCommerciant.getCashbackStrategy().equals("nrOfTransactions")) {
-            return 0;
-        }
-
-        if (lastCommerciant.getType().equals("Food") && account.getCashbackForFood() > 0) {
+    //Helper method for getCashbackNrOfTransactions
+    private boolean applyCashbackForType(Account account, String type, double amount) {
+        if ("Food".equals(type) && account.getCashbackForFood() > 0) {
             account.setCashbackForFood(-1);
-            return Double.parseDouble(amount) * 0.02;
+            return true;
         }
-
-        if (lastCommerciant.getType().equals("Clothes") && account.getCashbackForClothes() > 0) {
+        if ("Clothes".equals(type) && account.getCashbackForClothes() > 0) {
             account.setCashbackForClothes(-1);
-            return Double.parseDouble(amount) * 0.05;
+            return true;
         }
-
-        if (lastCommerciant.getType().equals("Tech") && account.getCashbackForTech() > 0) {
+        if ("Tech".equals(type) && account.getCashbackForTech() > 0) {
             account.setCashbackForTech(-1);
-            return Double.parseDouble(amount) * 0.1;
+            return true;
         }
-
-        for (JsonNode transaction : account.getTransactions()) {
-            if (transaction.get("commerciant") != null) {
-                CommerciantInput commerciant =
-                        searchCommerciant(transaction.get("commerciant").asText());
-                if (commerciant != null && "nrOfTransactions".equals(commerciant.getCashbackStrategy())) {
-                    long numberOfCommerciants =
-                            StreamSupport.stream
-                                            (account.getTransactions().spliterator(), false)
-                            .filter(t -> t.get("commerciant") != null)
-                            .count();
-                    if (numberOfCommerciants == 2) account.setCashbackForFood(1);
-                    if (numberOfCommerciants == 5) account.setCashbackForClothes(1);
-                    if (numberOfCommerciants == 10) account.setCashbackForTech(1);
-                }
-            }
-        }
-        return 0;
+        return false;
     }
 
-    public CommerciantInput searchCommerciant(final String commerciant) {
-        for (CommerciantInput commerciantJson : getInput().getCommerciants()) {
-            if (commerciantJson.getCommerciant().equals(commerciant)) {
-                return commerciantJson;
-            }
-        }
-        return null;
+    //Helper method for getCashbackNrOfTransactions
+    private double cashbackAmount(String type, double amount) {
+        return switch (type) {
+            case "Food" -> amount * 0.02;
+            case "Clothes" -> amount * 0.05;
+            case "Tech" -> amount * 0.1;
+            default -> 0;
+        };
+    }
+
+    //Helper method for getCashbackNrOfTransactions
+    private void updateCashbackBasedOnTransactions(Account account) {
+        long numberOfCommerciants = StreamSupport.stream(account.getTransactions().spliterator(), false)
+                .filter(t -> t.get("commerciant") != null)
+                .count();
+
+        if (numberOfCommerciants == 2) account.setCashbackForFood(1);
+        if (numberOfCommerciants == 5) account.setCashbackForClothes(1);
+        if (numberOfCommerciants == 10) account.setCashbackForTech(1);
     }
 
     /**
@@ -278,6 +302,15 @@ public final class Bank {
         return null;
     }
 
+    public CommerciantInput searchCommerciant(final String commerciant) {
+        for (CommerciantInput commerciantJson : getInput().getCommerciants()) {
+            if (commerciantJson.getCommerciant().equals(commerciant)) {
+                return commerciantJson;
+            }
+        }
+        return null;
+    }
+
     /**
      * Searches user by email in bank data
      * @param email User corresponding email, stored as a string
@@ -304,6 +337,15 @@ public final class Bank {
                 if (account.getNumber().equals(number) || (!alias.isEmpty() && alias.equals(number))) {
                     return account;
                 }
+            }
+        }
+        return null;
+    }
+
+    public CommerciantInput searchCommerciantAccount (final String number) {
+        for (CommerciantInput commerciant : getInput().getCommerciants()) {
+            if (commerciant.getAccount().equals(number)) {
+                return commerciant;
             }
         }
         return null;
@@ -364,4 +406,26 @@ public final class Bank {
         getUsers().add(user);
     }
 
+    public List<SplitPayment> searchSplitPaymentsListByUser(final String email, final String type) {
+        List<SplitPayment> splitPaymentFoundList = null;
+        for (List<SplitPayment> splitPaymentList : getListsOfSplitPayments()) {
+            for (SplitPayment splitPayment : splitPaymentList) {
+                if (splitPayment.getType().equals(type)) {
+                    if (splitPayment.getUser().getUserInformation().getEmail().equals(email)) {
+                        splitPayment.setAccepted(true);
+                        splitPaymentFoundList = splitPaymentList;
+                    }
+                }
+            }
+        }
+        return splitPaymentFoundList;
+    }
+
+    public void addListOfSplitPayments() {
+        this.listsOfSplitPayments.add(new ArrayList<>());
+    }
+
+    public void addSplitPaymentToList(final SplitPayment splitPayment) {
+        this.listsOfSplitPayments.getLast().add(splitPayment);
+    }
 }

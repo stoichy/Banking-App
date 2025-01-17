@@ -15,12 +15,13 @@ public class HandlerFactory {
 
     public CommandHandler getHandlerType(CommandInput commandHandlerType, Bank bank) {
         return switch (commandHandlerType.getCommand()) {
-            case "addAccount", "setMinBalance", "printTransactions", "withdrawSavings" ->
+            case "addAccount", "setMinBalance", "printTransactions", "withdrawSavings", "addNewBusinessAssociate" ->
                 new UserCommandHandler(commandHandlerType, bank);
-            case "printUsers", "addInterest", "splitPayment", "changeInterestRate" ->
+            case "printUsers", "addInterest", "splitPayment", "changeInterestRate",
+                 "rejectSplitPayment", "acceptSplitPayment", "businessReport" ->
                 new BankCommandHandler(commandHandlerType, bank);
             case "createCard", "createOneTimeCard", "report", "spendingsReport", "setAlias",
-                 "sendMoney", "deleteAccount", "addFunds", "upgradePlan" ->
+                 "sendMoney", "deleteAccount", "addFunds", "upgradePlan", "changeSpendingLimit", "changeDepositLimit" ->
                 new AccountCommandHandler(commandHandlerType, bank);
             case "deleteCard", "checkCardStatus", "payOnline", "cashWithdrawal" ->
                 new CardCommandHandler(commandHandlerType, bank);

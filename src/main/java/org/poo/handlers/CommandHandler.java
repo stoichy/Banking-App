@@ -32,7 +32,7 @@ public abstract class CommandHandler {
         ObjectNode actionResult = getJsonWithHeader(getCommand());
         ObjectNode error = new ObjectMapper().createObjectNode();
         error.put("description", "Account not found");
-        error.put("timestamp", bank.getTimestamp());
+        error.put("timestamp", getCommand().getTimestamp());
         actionResult.set("output", error);
         actionResult.put("timestamp", getCommand().getTimestamp());
         return actionResult;

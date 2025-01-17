@@ -12,21 +12,24 @@
     "transferType" : "sent"
   } ],
   "timestamp" : 25
-}, {
+},
+{
   "command" : "payOnline",
   "output" : {
     "timestamp" : 26,
     "description" : "Card not found"
   },
   "timestamp" : 26
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 3,
     "description" : "New account created"
   } ],
   "timestamp" : 27
-}, {
+},
+{
   "command" : "printUsers",
   "output" : [ {
     "firstName" : "Anastasie",
@@ -140,14 +143,16 @@
     } ]
   } ],
   "timestamp" : 41
-}, {
+},
+{
   "command" : "cashWithdrawal",
   "output" : {
     "timestamp" : 42,
     "description" : "Card not found"
   },
   "timestamp" : 42
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 3,
@@ -161,7 +166,8 @@
     "transferType" : "sent"
   } ],
   "timestamp" : 55
-}, {
+},
+  {
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 1,
@@ -173,7 +179,7 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   }, {
     "timestamp" : 23,
     "description" : "Shopping at Galeries Lafayette",
@@ -190,7 +196,8 @@
     "transferType" : "received"
   } ],
   "timestamp" : 80
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 2,
@@ -202,7 +209,7 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   }, {
     "timestamp" : 23,
     "description" : "Shopping at Galeries Lafayette",
@@ -212,7 +219,8 @@
     "transferType" : "received"
   } ],
   "timestamp" : 81
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 3,
@@ -224,7 +232,7 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   }, {
     "timestamp" : 54,
     "description" : "Weekly groceries from Carrefour",
@@ -234,7 +242,8 @@
     "transferType" : "sent"
   } ],
   "timestamp" : 82
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 4,
@@ -246,10 +255,11 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   } ],
   "timestamp" : 83
-}, {
+},
+  {
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 5,
@@ -261,24 +271,27 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   } ],
   "timestamp" : 84
-}, {
+},
+{
   "command" : "payOnline",
   "output" : {
     "timestamp" : 85,
     "description" : "Card not found"
   },
   "timestamp" : 85
-}, {
+},
+{
   "command" : "payOnline",
   "output" : {
     "timestamp" : 86,
     "description" : "Card not found"
   },
   "timestamp" : 86
-}, {
+},
+{
   "command" : "printUsers",
   "output" : [ {
     "firstName" : "Anastasie",
@@ -392,49 +405,56 @@
     } ]
   } ],
   "timestamp" : 87
-}, {
+},
+{
   "command" : "payOnline",
   "output" : {
     "timestamp" : 226,
     "description" : "Card not found"
   },
   "timestamp" : 226
-}, {
+},
+{
   "command" : "payOnline",
   "output" : {
     "timestamp" : 227,
     "description" : "Card not found"
   },
   "timestamp" : 227
-}, {
+},
+{
   "command" : "payOnline",
   "output" : {
     "timestamp" : 228,
     "description" : "Card not found"
   },
   "timestamp" : 228
-}, {
+},
+{
   "command" : "payOnline",
   "output" : {
     "timestamp" : 229,
     "description" : "Card not found"
   },
   "timestamp" : 229
-}, {
+},
+{
   "command" : "payOnline",
   "output" : {
     "timestamp" : 230,
     "description" : "Card not found"
   },
   "timestamp" : 230
-}, {
+},
+{
   "command" : "payOnline",
   "output" : {
     "timestamp" : 231,
     "description" : "Card not found"
   },
   "timestamp" : 231
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 1,
@@ -446,7 +466,7 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   }, {
     "timestamp" : 23,
     "description" : "Shopping at Galeries Lafayette",
@@ -471,7 +491,8 @@
     "transferType" : "received"
   } ],
   "timestamp" : 232
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 2,
@@ -483,7 +504,7 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   }, {
     "timestamp" : 23,
     "description" : "Shopping at Galeries Lafayette",
@@ -493,7 +514,8 @@
     "transferType" : "received"
   } ],
   "timestamp" : 233
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 3,
@@ -505,7 +527,7 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   }, {
     "timestamp" : 28,
     "description" : "Split payment of 2235.00 EUR",
@@ -523,7 +545,8 @@
     "transferType" : "sent"
   } ],
   "timestamp" : 234
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 4,
@@ -535,10 +558,11 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   } ],
   "timestamp" : 235
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 5,
@@ -550,10 +574,11 @@
     "currency" : "EUR",
     "amountForUsers" : [ 813.33, 893.0, 665.0, 1570.0, 35.0 ],
     "involvedAccounts" : [ "RO58POOB2721178218599590", "RO58POOB7344468893732422", "RO65POOB8944016386845896", "RO90POOB5450777208072365", "RO69POOB6209498372540635" ],
-    "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
+    "error" : "Account RO65POOB8944016386845896 has insufficient funds for a split payment."
   } ],
   "timestamp" : 236
-}, {
+},
+{
   "command" : "printTransactions",
   "output" : [ {
     "timestamp" : 9,
@@ -568,7 +593,8 @@
     "error" : "Account RO90POOB5450777208072365 has insufficient funds for a split payment."
   } ],
   "timestamp" : 237
-}, {
+},
+{
   "command" : "printUsers",
   "output" : [ {
     "firstName" : "Anastasie",

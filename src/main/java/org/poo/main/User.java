@@ -26,6 +26,11 @@ public final class User {
         setUserInformation(userInformation);
         setAccounts(new ArrayList<>());
         setTransactions(new ObjectMapper().createArrayNode());
+        if (userInformation.getOccupation().equals("student")) {
+            setPlan("student");
+        } else {
+            setPlan("standard");
+        }
     }
 
     public int getAge() {

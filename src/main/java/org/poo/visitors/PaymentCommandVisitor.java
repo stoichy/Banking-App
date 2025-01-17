@@ -6,14 +6,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.poo.fileio.CommandInput;
 import org.poo.handlers.CommandHandler;
-import org.poo.main.Account;
-import org.poo.main.Bank;
-import org.poo.main.Card;
-import org.poo.main.User;
+import org.poo.main.*;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+
+
 
 public final class PaymentCommandVisitor implements CommandVisitorInterface {
 
@@ -24,59 +23,109 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
      * @return Null, no output is needed
      */
     public ObjectNode visit(final Bank bank, final CommandHandler handler) {
-        Account account;
-        double amount;
-        int numberOfAccounts = handler.getCommand().getAccounts().size();
+        CommandInput commandData = handler.getCommand();
+        switch (commandData.getCommand()) {
+            case "acceptSplitPayment":
+                if (bank.searchUser(commandData.getEmail()) == null) {
+                    return handler.userNotFoundJson();
+                }
+                customSplitPayment(bank, commandData.getEmail(), commandData.getSplitPaymentType(), "accept");
+                return null;
+            case "rejectSplitPayment":
+                if (bank.searchUser(commandData.getEmail()) == null) {
+                    return handler.userNotFoundJson();
+                }
+                customSplitPayment(bank, commandData.getEmail(), commandData.getSplitPaymentType(), "reject");
+                return null;
+        }
 
-        //Check if each account has enough funds for split payment
-        for (int i = numberOfAccounts - 1; i >= 0; i--) {
-            String accountNumber = handler.getCommand().getAccounts().get(i);
-            account = bank.searchAccount(accountNumber);
-            amount = handler.getCommand().getAmount();
+        List<String> accounts = commandData.getAccounts();
+        int numberOfAccounts = accounts.size();
+        List<Double> amountForUsers = commandData.getAmountForUsers();
+        double totalAmount = commandData.getAmount();
+        String commandCurrency = commandData.getCurrency();
+        String splitPaymentType = commandData.getSplitPaymentType();
 
+        if (splitPaymentType.equals("equal")) {
+            double equalAmount = totalAmount / numberOfAccounts;
+            if (amountForUsers == null) {
+                amountForUsers = new ArrayList<>(Collections.nCopies(numberOfAccounts, equalAmount));
+                commandData.setAmountForUsers(amountForUsers);
+            }
+        }
+
+        bank.addListOfSplitPayments();
+
+        for (int i = 0; i < numberOfAccounts; i++) {
+            Account account = bank.searchAccount(accounts.get(i));
             if (account == null) {
                 return null;
             }
 
-            if (!account.getCurrency().equals(handler.getCommand().getCurrency())) {
-                amount = handler.getBank().exchange(account.getCurrency(),
-                        handler.getCommand().getCurrency(), handler.getCommand().getAmount());
+            double paymentAmount = splitPaymentType.equals("equal") ? amountForUsers.get(i) : commandData.getAmountForUsers().get(i);
+
+            if (!account.getCurrency().equals(commandCurrency)) {
+                paymentAmount = bank.exchange(account.getCurrency(), commandCurrency, paymentAmount);
             }
 
-            amount /= handler.getCommand().getAccounts().size();
-
-            if (account.getBalance() < amount) {
-                for (String accountNumberCopy : handler.getCommand().getAccounts()) {
-                    Account involvedAccount = bank.searchAccount(accountNumberCopy);
-                    if (involvedAccount != null) {
-                        User user = involvedAccount.getOwner();
-                        ObjectNode transaction = insufficientFundsForSplitJson(
-                                handler.getCommand(), account.getNumber());
-                        handler.addTransactions(user, involvedAccount, transaction);
-                    }
-                }
-                return null;
-            }
-        }
-
-        //Add transaction to each user and account
-        for (String accountNumber : handler.getCommand().getAccounts()) {
-            account = bank.searchAccount(accountNumber);
-            User user = account.getOwner();
-            amount = handler.getCommand().getAmount();
-
-            if (!account.getCurrency().equals(handler.getCommand().getCurrency())) {
-                amount = handler.getBank().exchange(account.getCurrency(),
-                        handler.getCommand().getCurrency(), handler.getCommand().getAmount());
-            }
-
-            account.setBalance(account.getBalance() - amount / numberOfAccounts);
-
-            ObjectNode transaction = splitPaymentJson(handler.getCommand());
-            handler.addTransactions(user, account, transaction);
+            bank.addSplitPaymentToList(new SplitPayment(
+                    account.getOwner(),
+                    account,
+                    totalAmount,
+                    paymentAmount,
+                    accounts,
+                    amountForUsers,
+                    account.getCurrency(),
+                    commandCurrency,
+                    splitPaymentType,
+                    commandData.getTimestamp()
+            ));
         }
 
         return null;
+    }
+
+    private void customSplitPayment(final Bank bank, final String email, final String paymentType, final String typeOfCommand) {
+        List<SplitPayment> splitPaymentList = bank.searchSplitPaymentsListByUser(email, paymentType);
+        if (splitPaymentList == null) {
+            return;
+        }
+
+        if (typeOfCommand.equals("accept")) {
+            if (checkSplitPaymentsStatus(splitPaymentList)) {
+                for (SplitPayment payment : splitPaymentList) {
+                    if (payment.getAccount().getBalance() < payment.getPaymentAmount()) {
+                        rejectSplitPayments(bank, splitPaymentList, payment.getAccount().getNumber());
+                        return;
+                    }
+                }
+                acceptSplitPayments(bank, splitPaymentList);
+            }
+        } else {
+            rejectSplitPayments(bank, splitPaymentList, "reject");
+        }
+    }
+
+    private void acceptSplitPayments(final Bank bank, final List<SplitPayment> splitPaymentList) {
+        splitPaymentList.forEach(payment -> {
+            payment.getAccount().setBalance(payment.getAccount().getBalance() - payment.getPaymentAmount());
+            payment.getUser().addTransaction(acceptSplitPaymentJson(splitPaymentList));
+        });
+        bank.getListsOfSplitPayments().remove(splitPaymentList);
+    }
+
+    private void rejectSplitPayments(final Bank bank, final List<SplitPayment> splitPaymentList, final String error) {
+        splitPaymentList.forEach(sp -> sp.getUser().addTransaction(rejectSplitPaymentJson(splitPaymentList, error)));
+        bank.getListsOfSplitPayments().remove(splitPaymentList);
+    }
+
+    private boolean checkSplitPaymentsStatus(final List<SplitPayment> splitPayments) {
+        for (SplitPayment splitPayment : splitPayments) {
+            if (!splitPayment.isAccepted()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -96,55 +145,70 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
      * @return Null, no output is needed
      */
     public ObjectNode visit(final Account senderAccount, final CommandHandler handler) {
-        CommandInput command = handler.getCommand();
-        Account receiverAccount = handler.getBank().searchAccount(command.getReceiver());
+        Bank bankData = handler.getBank();
+        CommandInput commandData = handler.getCommand();
+
+        Account receiverAccount = bankData.searchAccount(commandData.getReceiver());
         User senderUser = senderAccount.getOwner();
-        double amount = command.getAmount();
+        double amount = commandData.getAmount();
+        double amountPlusCommission = bankData.getCommission(senderAccount, amount);
 
-        if (receiverAccount == null) {
-            return handler.userNotFoundJson();
-        }
-
-        //Check if sender has alias and return null if true (error)
-        if (handler.getCommand().getAccount().equals(senderAccount.getAlias())) {
+        if (!senderUser.getUserInformation().getEmail().equals(handler.getCommand().getEmail())) {
             return null;
         }
 
-        //Account doesn't have enough money to send
-        if (senderAccount.getBalance() < amount) {
-            handler.addTransactions(senderUser,
-                                    senderAccount,
-                                    senderAccount.insufficientFundsJson(
-                                            handler.getCommand().getTimestamp()));
+        if (receiverAccount == null) {
+            if (bankData.searchCommerciantAccount(commandData.getReceiver()) == null) {
+                return handler.userNotFoundJson();
+            }
+            if (isBusinessAccount(senderAccount, senderUser, commandData)) {
+                senderAccount.getExpenses().add(new Object[]{senderUser.getUserInformation().getEmail(),
+                        commandData.getAmount(),
+                        bankData.searchCommerciantAccount(commandData.getReceiver()).getCommerciant()});
+            }
+            processTransaction(senderAccount, amountPlusCommission, handler, senderUser, commandData.getReceiver());
+            return null;
+        }
+
+        if (commandData.getAccount().equals(senderAccount.getAlias()) || senderAccount.getBalance() < amountPlusCommission) {
+            handler.addTransactions(senderUser, senderAccount, senderAccount.insufficientFundsJson(commandData.getTimestamp()));
             return null;
         }
 
         User receiverUser = receiverAccount.getOwner();
-
-        //Check if currencies of accounts are different and exchange if true
-        if (!senderAccount.getCurrency().equals(receiverAccount.getCurrency())) {
-            handler.getCommand().setCurrency(senderAccount.getCurrency());
-            amount = handler.getBank().exchange(receiverAccount.getCurrency(),
-                    handler.getCommand().getCurrency(), handler.getCommand().getAmount());
+        if (isBusinessAccount(senderAccount, senderUser, commandData)) {
+            return null;
         }
 
-        handler.addTransactions(senderUser, senderAccount,
-                                transferSenderJson(senderAccount, receiverAccount, handler));
+        if (!senderAccount.getCurrency().equals(receiverAccount.getCurrency())) {
+            amount = bankData.exchange(receiverAccount.getCurrency(), senderAccount.getCurrency(), amount);
+        }
 
-        handler.addTransactions(receiverUser, receiverAccount,
-                                transferReceiverJson
-                                        (senderAccount, receiverAccount, amount, handler));
+        handler.addTransactions(senderUser, senderAccount, transferSenderJson(senderAccount.getNumber(), receiverAccount.getNumber(), senderAccount.getCurrency(), handler));
+        handler.addTransactions(receiverUser, receiverAccount, transferReceiverJson(senderAccount.getNumber(), receiverAccount.getNumber(), receiverAccount.getCurrency(), amount, handler));
 
         receiverAccount.setBalance(receiverAccount.getBalance() + amount);
-
-        senderAccount.setBalance(senderAccount.getBalance() -
-                handler.getBank().commission
-                        (handler.getBank().searchUserByAccount(senderAccount.getNumber()),
-                                handler.getCommand().getAmount()));
-        senderAccount.setBalance
-                (senderAccount.getBalance() + handler.getBank().getCashback(senderAccount));
+        senderAccount.setBalance(senderAccount.getBalance() - amountPlusCommission + bankData.getCashback(senderAccount));
 
         return null;
+    }
+
+    private void processTransaction(Account senderAccount, double amountPlusCommission, CommandHandler handler, User senderUser, String receiver) {
+        handler.addTransactions(senderUser, senderAccount, transferSenderJson(senderAccount.getNumber(), receiver, senderAccount.getCurrency(), handler));
+        senderAccount.setBalance(senderAccount.getBalance() - amountPlusCommission + handler.getBank().getCashback(senderAccount));
+    }
+
+    private boolean isBusinessAccount(Account senderAccount, User senderUser, CommandInput commandData) {
+        if (senderAccount.getType().equals("business")) {
+            String userPosition = senderAccount.getUserPosition(senderUser.getUserInformation().getEmail());
+            if (userPosition.equals("employee") && commandData.getAmount() > senderAccount.getSpendingLimit()) {
+                return true;
+            }
+            if (!userPosition.equals("owner")) {
+                senderAccount.getExpenses().add(new Object[]{senderUser.getUserInformation().getEmail(), commandData.getAmount()});
+            }
+        }
+        return false;
     }
 
     /**
@@ -154,48 +218,58 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
      * @return Null, no output is needed
      */
     public ObjectNode visit(final Card card, final CommandHandler handler) {
+        Bank bankData = handler.getBank();
+        CommandInput commandData = handler.getCommand();
+
         Account account = card.getAccount();
-        User user = handler.getBank().
-                searchUser(handler.getCommand().getEmail());
-        double amount = handler.getCommand().getAmount();
+        User user = bankData.searchUser(commandData.getEmail());
+
+        double amount = commandData.getAmount();
         double amountPlusCommission;
 
-        if (user == null){
+        if (amount == 0 || user == null) {
             return null;
         }
 
         //Check if card is frozen
         if (card.getFrozen()) {
-            handler.addTransactions(
-                    user, account, card.isFrozenJson(handler.getCommand().getTimestamp()));
+            handler.addTransactions(user, account, card.isFrozenJson(commandData.getTimestamp()));
             return null;
         }
 
         //Exchange money if currencies of account and payment are different
-        if (!handler.getCommand().getCurrency().equals(account.getCurrency())) {
-            amount = handler.getBank().exchange(account.getCurrency(),
-                    handler.getCommand().getCurrency(), handler.getCommand().getAmount());
+        if (!commandData.getCurrency().equals(account.getCurrency())) {
+            amount = bankData.exchange
+                    (account.getCurrency(), commandData.getCurrency(), commandData.getAmount());
         }
 
         //Check if account doesn't have enough funds to pay
         if (account.getBalance() < amount) {
-            handler.addTransactions(
-                    user,
-                    account,
-                    account.insufficientFundsJson(handler.getCommand().getTimestamp()));
+            handler.addTransactions(user, account,
+                    account.insufficientFundsJson(commandData.getTimestamp()));
             return null;
         }
 
-        BigDecimal roundedAmount = new BigDecimal(amount).setScale(2, RoundingMode.HALF_UP);
-        handler.addTransactions(user, account, card.paymentJson(roundedAmount.doubleValue(),
-                handler.getCommand().getCommerciant(),
+        amountPlusCommission = bankData.getCommission(account, amount);
+
+        if (account.getType().equals("business")) {
+            if ((account.getUserPosition(user.getUserInformation().getEmail()).equals("employee") &&
+                    amount > account.getSpendingLimit())) {
+                return null;
+            }
+            if (!account.getUserPosition(user.getUserInformation().getEmail()).equals("owner")) {
+                account.getExpenses().add
+                        (new Object[]{user.getUserInformation().getEmail(), amount,
+                                commandData.getCommerciant()});
+            }
+        }
+
+        handler.addTransactions(user, account, card.paymentJson(amount,
+                commandData.getCommerciant(),
                 handler));
 
-        amountPlusCommission = handler.getBank().commission(user, amount);
-        if (handler.getCommand().getTimestamp() == 13) {
-            System.out.println(amountPlusCommission);
-        }
         account.setBalance(account.getBalance() - amountPlusCommission);
+        account.setBalance(account.getBalance() + bankData.getCashback(account));
 
         if (card.isOneTime()) {
             Card newCard = new Card.Builder(account).oneTime().build();
@@ -210,74 +284,95 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
         return null;
     }
 
-    private ObjectNode transferTemplateJson(
-            final Account senderAccount,
-            final Account receiverAccount,
-            final String result,
-            final CommandHandler handler) {
+    private ObjectNode transferTemplateJson(final String senderAccount, final String receiverAccount,
+            final String result, final CommandHandler handler) {
         ObjectNode transaction = new ObjectMapper().createObjectNode();
         transaction.put("timestamp", handler.getCommand().getTimestamp());
         transaction.put("description", handler.getCommand().getDescription());
-        transaction.put("senderIBAN", senderAccount.getNumber());
-        transaction.put("receiverIBAN", receiverAccount.getNumber());
+        transaction.put("senderIBAN", senderAccount);
+        transaction.put("receiverIBAN", receiverAccount);
         transaction.put("amount", result);
         return transaction;
     }
 
-    private ObjectNode transferSenderJson(final Account senderAccount,
-                                          final Account receiverAccount,
-                                          final CommandHandler handler) {
-        String result = handler.getCommand().getAmount() + " " + senderAccount.getCurrency();
+    private ObjectNode transferSenderJson(final String senderAccount, final String receiverAccount,
+                                          final String senderCurrency, final CommandHandler handler) {
+        String result = handler.getCommand().getAmount() + " " + senderCurrency;
         ObjectNode transaction =
                 transferTemplateJson(senderAccount, receiverAccount, result, handler);
         transaction.put("transferType", "sent");
         return transaction;
     }
 
-    private ObjectNode transferReceiverJson(
-            final Account senderAccount,
-            final Account receiverAccount,
-            final double amount,
-            final CommandHandler handler) {
-        String result = amount + " " + receiverAccount.getCurrency();
+    private ObjectNode transferReceiverJson(final String senderAccount, final String receiverAccount,
+            final String receiverCurrency, final double amount, final CommandHandler handler) {
+        String result = amount + " " + receiverCurrency;
         ObjectNode transaction =
                 transferTemplateJson(senderAccount, receiverAccount, result, handler);
         transaction.put("transferType", "received");
         return transaction;
     }
 
-    private ObjectNode paymentTemplateJson(
-            final CommandInput handler, final String insufficientFundsAccount) {
-        double amount = handler.getAmount();
-        String currency = handler.getCurrency();
-        List<String> accounts = handler.getAccounts();
-
-        ObjectNode output = new ObjectMapper().createObjectNode();
-        output.put("amount",
-                amount / accounts.size());
-        output.put("currency", currency);
-        output.put("description",
-                "Split payment of " + String.format("%.2f", amount) + " " + currency);
-        ArrayNode accountsJson = new ObjectMapper().createArrayNode();
-        for (String account : accounts) {
-            accountsJson.add(account);
-        }
-        if (insufficientFundsAccount != null) {
-            output.put("error", "Account " + insufficientFundsAccount
-                    + " has insufficient funds for a split payment.");
-        }
-        output.set("involvedAccounts", accountsJson);
-        output.put("timestamp", handler.getTimestamp());
-        return output;
+    private ObjectNode createCommonJson(SplitPayment splitPayment) {
+        ObjectNode json = new ObjectMapper().createObjectNode();
+        json.put("currency", splitPayment.getSplitPaymentCurrency());
+        json.put("description", "Split payment of " + String.format("%.2f", splitPayment.getTotalAmount()) + " " + splitPayment.getSplitPaymentCurrency());
+        json.set("involvedAccounts", createArrayNode(splitPayment.getAccounts()));
+        json.put("splitPaymentType", splitPayment.getType());
+        json.put("timestamp", splitPayment.getTimestamp());
+        return json;
     }
 
-    private ObjectNode splitPaymentJson(final CommandInput handler) {
-        return paymentTemplateJson(handler, null);
+    private ArrayNode createArrayNode(List<String> list) {
+        ArrayNode arrayNode = new ObjectMapper().createArrayNode();
+        for (String item : list) {
+            arrayNode.add(item);
+        }
+        return arrayNode;
     }
 
-    private ObjectNode insufficientFundsForSplitJson(
-            final CommandInput splitInformation, final String account) {
-        return paymentTemplateJson(splitInformation, account);
+    private ArrayNode createArrayNodeFromDoubles(List<Double> list) {
+        ArrayNode arrayNode = new ObjectMapper().createArrayNode();
+        for (Double item : list) {
+            arrayNode.add(item);
+        }
+        return arrayNode;
+    }
 
+    public ObjectNode acceptSplitPaymentJson(List<SplitPayment> splitPayments) {
+        SplitPayment splitPayment = splitPayments.getFirst();
+        if (splitPayment.getAmounts() == null) {
+            return null;
+        }
+
+        ObjectNode json = createCommonJson(splitPayment);
+        if (splitPayment.getType().equals("custom")) {
+            json.set("amountForUsers", createArrayNodeFromDoubles(splitPayment.getAmounts()));
+        } else {
+            json.put("amount", splitPayment.getAmounts().getFirst());
+        }
+        return json;
+    }
+
+    public ObjectNode rejectSplitPaymentJson(List<SplitPayment> splitPayments, String error) {
+        SplitPayment splitPayment = splitPayments.getFirst();
+        if (splitPayment.getAmounts() == null) {
+            return null;
+        }
+
+        ObjectNode json = createCommonJson(splitPayment);
+        if (splitPayment.getType().equals("custom")) {
+            json.set("amountForUsers", createArrayNodeFromDoubles(splitPayment.getAmounts()));
+        } else {
+            json.put("amount", splitPayment.getAmounts().getFirst());
+        }
+
+        if (error.equals("reject")) {
+            json.put("error", "One user rejected the payment.");
+        } else {
+            json.put("error", "Account " + error + " has insufficient funds for a split payment.");
+        }
+
+        return json;
     }
 }

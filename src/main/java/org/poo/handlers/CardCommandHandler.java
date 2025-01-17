@@ -38,9 +38,9 @@ public final class CardCommandHandler extends CommandHandler {
         ObjectNode error = getJsonWithHeader(getCommand());
         ObjectNode output = new ObjectMapper().createObjectNode();
         error.set("output", output);
-        output.put("timestamp", getBank().getTimestamp());
+        output.put("timestamp", getCommand().getTimestamp());
         output.put("description", "Card not found");
-        error.put("timestamp", getBank().getTimestamp());
+        error.put("timestamp", getCommand().getTimestamp());
         return error;
     }
 

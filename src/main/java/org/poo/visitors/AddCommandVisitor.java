@@ -1,11 +1,14 @@
 package org.poo.visitors;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.poo.handlers.CommandHandler;
 import org.poo.main.Account;
 import org.poo.main.Bank;
 import org.poo.main.User;
 import org.poo.main.Card;
+
+import java.util.ArrayList;
 
 public final class AddCommandVisitor implements CommandVisitorInterface {
 
@@ -17,13 +20,17 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
      */
     public ObjectNode visit(final Bank bank, final CommandHandler handler) {
         Account account = bank.searchAccount(handler.getCommand().getAccount());
+        User user = bank.searchUserByAccount(handler.getCommand().getAccount());
 
         if (!account.getType().equals("savings")) {
             return handler.notSavingsAccountErrorJson();
         }
 
+        double amount = account.getInterestRate() * account.getBalance();
         account.setBalance(account.getBalance()
-                + handler.getCommand().getInterestRate() * account.getBalance());
+                + amount);
+
+        handler.addTransactions(user, account, interestIncomeJson(handler, account, amount));
 
         return null;
     }
@@ -40,8 +47,24 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
             account = new Account.Builder(handler.getCommand(), user).
                     type("savings").interestRate(handler.getCommand().getInterestRate()).build();
         } else {
-            account = new Account.Builder(handler.getCommand(), user).
-                    type("classic").build();
+            if (handler.getCommand().getAccountType().equals("classic")) {
+                account = new Account.Builder(handler.getCommand(), user).
+                        type("classic").build();
+            } else {
+                account = new Account.Builder(handler.getCommand(), user).
+                        type("business").build();
+                account.setEmployees(new ArrayList<>());
+                account.setManagers(new ArrayList<>());
+                double limit;
+                if (!account.getCurrency().equals("RON")) {
+                    limit = handler.getBank().exchange(account.getCurrency(),
+                            "RON", 500);
+                } else {
+                    limit = 500;
+                }
+                account.setDepositLimit(limit);
+                account.setSpendingLimit(limit);
+            }
         }
 
         user.addAccount(account);
@@ -59,6 +82,16 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
      * @return Null, no output is needed
      */
     public ObjectNode visit(final Account account, final CommandHandler handler) {
+        if (account.getType().equals("business")) {
+            String userPosition = account.getUserPosition(handler.getCommand().getEmail());
+            if (userPosition.equals("employee") && handler.getCommand().getAmount() > account.getDepositLimit()) {
+                return null;
+            }
+            if (!userPosition.equals("owner")) {
+                account.getDeposits().add(new Object[]{handler.getCommand().getEmail(),
+                        handler.getCommand().getAmount()});
+            }
+        }
         account.setBalance(account.getBalance() + handler.getCommand().getAmount());
 
         return null;
@@ -72,6 +105,16 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
      */
     public ObjectNode visit(final Card card, final CommandHandler handler) {
         return null;
+    }
+
+    public ObjectNode interestIncomeJson
+            (final CommandHandler handler, final Account account, final double amount) {
+        ObjectNode json = new ObjectMapper().createObjectNode();
+        json.put("amount", amount);
+        json.put("currency", account.getCurrency());
+        json.put("description", "Interest rate income");
+        json.put("timestamp", handler.getCommand().getTimestamp());
+        return json;
     }
 
 }

@@ -2,6 +2,7 @@ package org.poo.visitors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.poo.fileio.CommandInput;
 import org.poo.handlers.CommandHandler;
 import org.poo.main.Bank;
 import org.poo.main.Account;
@@ -27,7 +28,7 @@ public final class SetterCommandVisitor implements CommandVisitorInterface {
             return handler.notSavingsAccountErrorJson();
         }
 
-        handler.addTransactions(user, account, changedInterestTransactionJson(handler));
+        handler.addTransactions(user, account, changedInterestTransactionJson(handler.getCommand()));
 
         return null;
     }
@@ -67,13 +68,13 @@ public final class SetterCommandVisitor implements CommandVisitorInterface {
 
     /**
      * Prints change of interest rate
-     * @param handler Command data
+     * @param command Command data
      * @return Transaction details in Json format encapsulated in ObjectNode
      */
-    public ObjectNode changedInterestTransactionJson(final CommandHandler handler) {
+    public ObjectNode changedInterestTransactionJson(final CommandInput command) {
         ObjectNode output = new ObjectMapper().createObjectNode();
-        output.put("description", "Interest rate of the account changed to 0.81");
-        output.put("timestamp", handler.getCommand().getTimestamp());
+        output.put("description", "Interest rate of the account changed to " + command.getInterestRate());
+        output.put("timestamp", command.getTimestamp());
         return output;
     }
 }

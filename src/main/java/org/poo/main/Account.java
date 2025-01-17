@@ -12,8 +12,6 @@ import org.poo.handlers.CommandHandler;
 import org.poo.visitors.CommandVisitorInterface;
 import org.poo.utils.Utils;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,22 +21,26 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 public class Account {
-    private String number;
     private double balance;
-    private String currency;
-    private String type;
-    private String alias;
-    private List<Card> cards;
-    private ArrayNode transactions;
     private double minimumBalance;
-    private User owner;
     private double interestRate;
     private double cashbackForClothes;
     private double cashbackForFood;
     private double cashbackForTech;
-    private double spendingThreshold100;
-    private double spendingThreshold300;
-    private double spendingThreshold500;
+    private double spendingThreshold;
+    private double spendingLimit; //Business
+    private double depositLimit; //Business
+    private String number;
+    private String currency;
+    private String type;
+    private String alias;
+    private List<User> employees; //Business
+    private List<User> managers; //Business
+    private List<Card> cards;
+    private List<Object[]> deposits; //Business
+    private List<Object[]> expenses; //Business
+    private ArrayNode transactions;
+    private User owner;
 
     private Account(final Builder builder) {
         setNumber(builder.number);
@@ -51,6 +53,8 @@ public class Account {
         setAlias(builder.alias);
         setMinimumBalance(builder.minimumBalance);
         setInterestRate(builder.interestRate);
+        setDeposits(builder.deposits);
+        setExpenses(builder.expenses);
     }
 
     public static class Builder {
@@ -62,6 +66,8 @@ public class Account {
         private final ArrayNode transactions;
         private final double minimumBalance;
         private final User owner;
+        private List<Object[]> deposits;
+        private List<Object[]> expenses;
         private double interestRate = 0;
         private String type = "";
 
@@ -74,6 +80,8 @@ public class Account {
             this.transactions = new ObjectMapper().createArrayNode();
             this.minimumBalance = 0;
             this.owner = owner;
+            this.deposits = new ArrayList<>();
+            this.expenses = new ArrayList<>();
         }
 
         public Builder type(final String type) {
@@ -124,9 +132,8 @@ public class Account {
      */
     public ObjectNode toJson() {
         ObjectNode objectNode = new ObjectMapper().createObjectNode();
-        BigDecimal roundedBalance = BigDecimal.valueOf(getBalance()).setScale(2, RoundingMode.HALF_UP);
         objectNode.put("IBAN", getNumber());
-        objectNode.put("balance", roundedBalance.doubleValue());
+        objectNode.put("balance", getBalance());
         objectNode.put("currency", getCurrency());
         objectNode.put("type", getType());
         objectNode.set("cards", cardsToJson());
@@ -195,9 +202,9 @@ public class Account {
         ObjectNode resultNode = handler.getJsonWithHeader(handler.getCommand());
         ObjectNode successNode = new ObjectMapper().createObjectNode();
         successNode.put("success", "Account deleted");
-        successNode.put("timestamp", handler.getBank().getTimestamp());
+        successNode.put("timestamp", handler.getCommand().getTimestamp());
         resultNode.set("output", successNode);
-        resultNode.put("timestamp", handler.getBank().getTimestamp());
+        resultNode.put("timestamp", handler.getCommand().getTimestamp());
 
         return resultNode;
     }
@@ -295,6 +302,31 @@ public class Account {
         report.set("output", outputJson);
         report.put("timestamp", handler.getCommand().getTimestamp());
         return report;
+    }
+
+    public void addEmployee(final User user) {
+        getEmployees().add(user);
+    }
+
+    public void addManager(final User user) {
+        getManagers().add(user);
+    }
+
+    public String getUserPosition (final String email) {
+        if (getOwner().getUserInformation().getEmail().equals(email)) {
+            return "owner";
+        }
+        for (User user : getEmployees()) {
+            if (user.getUserInformation().getEmail().equals(email)) {
+                return "employee";
+            }
+        }
+        for (User user : getManagers()) {
+            if (user.getUserInformation().getEmail().equals(email)) {
+                return "manager";
+            }
+        }
+        return "";
     }
 
 }

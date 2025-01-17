@@ -17,9 +17,10 @@ public class CommandVisitorFactory {
                     -> new PrintCommandVisitor();
             case "createCard", "createOneTimeCard" -> new CreateCommandVisitor();
             case "deleteAccount", "deleteCard" -> new DeleteCommandVisitor();
-            case "payOnline", "sendMoney", "splitPayment" -> new PaymentCommandVisitor();
+            case "payOnline", "sendMoney", "splitPayment", "acceptSplitPayment", "rejectSplitPayment" -> new PaymentCommandVisitor();
             case "setAlias", "setMinBalance", "changeInterestRate" -> new SetterCommandVisitor();
             case "withdrawSavings", "upgradePlan", "cashWithdrawal" -> new WithdrawCommandVisitor();
+            case "addNewBusinessAssociate", "businessReport", "changeSpendingLimit", "changeDepositLimit"  -> new BusinessCommandVisitor();
             default -> null;
         };
     }

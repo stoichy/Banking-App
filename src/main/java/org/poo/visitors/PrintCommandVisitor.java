@@ -1,5 +1,6 @@
 package org.poo.visitors;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -9,6 +10,10 @@ import org.poo.main.Account;
 import org.poo.main.Bank;
 import org.poo.main.Card;
 import org.poo.main.User;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 public final class PrintCommandVisitor implements CommandVisitorInterface {
 
@@ -39,7 +44,21 @@ public final class PrintCommandVisitor implements CommandVisitorInterface {
      */
     public ObjectNode visit(final User user, final CommandHandler handler) {
         ObjectNode actionResult = handler.getJsonWithHeader(handler.getCommand());
-        actionResult.set("output", user.getCopyTransactions());
+        List<JsonNode> jsonNodes = new ArrayList<>();
+        user.getTransactions().forEach(jsonNodes::add);
+        jsonNodes.sort((node1, node2) -> {
+            JsonNode timestampNode1 = node1.get("timestamp");
+            JsonNode timestampNode2 = node2.get("timestamp");
+
+            // Handle null values for "timestamp"
+            int timestamp1 = (timestampNode1 != null) ? timestampNode1.asInt() : Integer.MAX_VALUE;
+            int timestamp2 = (timestampNode2 != null) ? timestampNode2.asInt() : Integer.MAX_VALUE;
+
+            return Integer.compare(timestamp1, timestamp2);
+        });
+        ArrayNode sortedArrayNode = new ObjectMapper().createArrayNode();
+        jsonNodes.forEach(sortedArrayNode::add);
+        actionResult.set("output", sortedArrayNode);
         actionResult.put("timestamp", handler.getCommand().getTimestamp());
         return actionResult;
     }
@@ -51,12 +70,12 @@ public final class PrintCommandVisitor implements CommandVisitorInterface {
      * @return Account's transactions details or error in Json format encapsulated in ObjectNode
      */
     public ObjectNode visit(final Account account, final CommandHandler handler) {
-        if (account.getType().equals("savings")) {
-            return reportNotAvailableJson(handler);
-        }
         if (handler.getCommand().getCommand().equals("report")) {
             return account.reportJson(handler);
         } else {
+            if (account.getType().equals("savings")) {
+                return reportNotAvailableJson(handler);
+            }
             return account.spendingReportJson(handler);
         }
     }
