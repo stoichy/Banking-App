@@ -12,7 +12,6 @@ import org.poo.main.Card;
 import org.poo.main.User;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 public final class PrintCommandVisitor implements CommandVisitorInterface {

@@ -2,14 +2,19 @@ package org.poo.visitors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.poo.fileio.CommandInput;
 import org.poo.fileio.CommerciantInput;
 import org.poo.handlers.CommandHandler;
-import org.poo.main.*;
+import org.poo.main.Bank;
+import org.poo.main.User;
+import org.poo.main.Account;
+import org.poo.main.Card;
+import org.poo.main.Commerciant;
 
 import java.util.ArrayList;
 
 public final class AddCommandVisitor implements CommandVisitorInterface {
-
+    private static final double DEFAULT_BUSINESS_ACCOUNT_LIMIT = 500;
     /**
      * Adds interest to account based on current interest rate
      * @param bank Bank data for accessing account details
@@ -55,9 +60,9 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
                 double limit;
                 if (!account.getCurrency().equals("RON")) {
                     limit = handler.getBank().exchange(account.getCurrency(),
-                            "RON", 500);
+                            "RON", DEFAULT_BUSINESS_ACCOUNT_LIMIT);
                 } else {
-                    limit = 500;
+                    limit = DEFAULT_BUSINESS_ACCOUNT_LIMIT;
                 }
                 account.setDepositLimit(limit);
                 account.setSpendingLimit(limit);
@@ -84,20 +89,22 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
      * @return Null, no output is needed
      */
     public ObjectNode visit(final Account account, final CommandHandler handler) {
+        CommandInput commandData = handler.getCommand();
         if (account.getType().equals("business")) {
-            String userPosition = account.getUserPosition(handler.getCommand().getEmail());
+            String userPosition = account.getUserPosition(commandData.getEmail());
             if (userPosition.isEmpty()) {
                 return null;
             }
-            if (userPosition.equals("employee") && handler.getCommand().getAmount() > account.getDepositLimit()) {
+            if (userPosition.equals("employee")
+                    && commandData.getAmount() > account.getDepositLimit()) {
                 return null;
             }
             if (!userPosition.equals("owner")) {
-                account.getDeposits().add(new Object[]{handler.getCommand().getEmail(),
-                        handler.getCommand().getAmount()});
+                account.getDeposits().add(new Object[]{commandData.getEmail(),
+                        commandData.getAmount()});
             }
         }
-        account.setBalance(account.getBalance() + handler.getCommand().getAmount());
+        account.setBalance(account.getBalance() + commandData.getAmount());
 
         return null;
     }
@@ -112,8 +119,15 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
         return null;
     }
 
-    public ObjectNode interestIncomeJson
-            (final CommandHandler handler, final Account account, final double amount) {
+    /**
+     * Creates a JSON format transaction for adding interest to account
+     * @param handler Command data
+     * @param account Account details
+     * @param amount Amount of interest to be added
+     * @return ObjectNode output that represents the transaction
+     */
+    public ObjectNode interestIncomeJson(
+            final CommandHandler handler, final Account account, final double amount) {
         ObjectNode json = new ObjectMapper().createObjectNode();
         json.put("amount", amount);
         json.put("currency", account.getCurrency());

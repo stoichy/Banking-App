@@ -23,7 +23,7 @@ public final class Card {
         setAccount(builder.account);
     }
 
-    public static class Builder {
+    public static final class Builder {
         private boolean oneTime = false;
         private final boolean frozen;
         private final String number;
@@ -36,12 +36,19 @@ public final class Card {
             this.account = account;
         }
 
-
-        public Builder oneTime () {
+        /**
+         * Set up variable as true if card is one time
+         * @return Builder for class
+         */
+        public Builder oneTime() {
             this.oneTime = true;
             return this;
         }
 
+        /**
+         * Builds new card with all builder's variables
+         * @return New created card
+         */
         public Card build() {
             return new Card(this);
         }

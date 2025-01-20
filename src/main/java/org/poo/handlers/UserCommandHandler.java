@@ -1,6 +1,5 @@
 package org.poo.handlers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.poo.main.User;
 import org.poo.visitors.CommandVisitorInterface;

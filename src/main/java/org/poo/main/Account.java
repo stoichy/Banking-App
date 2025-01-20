@@ -20,7 +20,7 @@ import java.util.Map;
 @Setter
 @Getter
 @NoArgsConstructor
-public class Account {
+public final class Account {
     private double balance;
     private double minimumBalance;
     private double interestRate;
@@ -59,7 +59,7 @@ public class Account {
         setCommerciants(builder.commerciants);
     }
 
-    public static class Builder {
+    public static final class Builder {
         private final String number;
         private final double balance;
         private final String currency;
@@ -88,16 +88,30 @@ public class Account {
             this.commerciants = new ArrayList<>();
         }
 
-        public Builder type(final String type) {
-            this.type = type;
+        /**
+         * Sets account type and returns class build
+         * @param accountType The type of account that should be created
+         * @return All Builder variables
+         */
+        public Builder type(final String accountType) {
+            this.type = accountType;
             return this;
         }
 
-        public Builder interestRate(final double interestRate) {
-            this.interestRate = interestRate;
+        /**
+         * Sets interest rate and returns class build
+         * @param accountInterestRate Interest rate of savings account
+         * @return All Builder variables
+         */
+        public Builder interestRate(final double accountInterestRate) {
+            this.interestRate = accountInterestRate;
             return this;
         }
 
+        /**
+         * Creates new Account class instance with given parameters
+         * @return New Account instance
+         */
         public Account build() {
             return new Account(this);
         }
@@ -318,14 +332,29 @@ public class Account {
         return report;
     }
 
+    /**
+     * Adds employee to business account
+     * @param user Employee to be added
+     */
     public void addEmployee(final User user) {
         getEmployees().add(user);
     }
 
+    /**
+     * Adds manager to business account
+     * @param user Manager to be added
+     */
     public void addManager(final User user) {
         getManagers().add(user);
     }
 
+    /**
+     * Finds user position in the business account hierarchy. If account is classic, return owner
+     * if the given email corresponds
+     * @param email Email of the user that needs to be found
+     * @return String corresponding to the user's position. If user doesn't belong to account,
+     * returns empty String.
+     */
     public String getUserPosition(final String email) {
         if (getOwner().getUserInformation().getEmail().equals(email)) {
             return "owner";
@@ -343,6 +372,11 @@ public class Account {
         return "";
     }
 
+    /**
+     * Searches commerciant from list of commerciants involved in account's payments
+     * @param commerciantName Name of commerciant needed to be found
+     * @return If found, returns commerciant class instance, null otherwise
+     */
     public Commerciant searchCommerciant(final String commerciantName) {
         for (Commerciant commerciant : getCommerciants()) {
             if (commerciant.getCommerciant().getCommerciant().equals(commerciantName)) {
@@ -352,25 +386,32 @@ public class Account {
         return null;
     }
 
-    public boolean foundUserInBusinessAccount(final User user) {
-        for (User manager : getManagers()) {
-            if (manager.getUserInformation().getEmail().equals(user.getUserInformation().getEmail())) {
-                return true;
-            }
-        }
-        for (User employee : getEmployees()) {
-            if (employee.getUserInformation().getEmail().equals(user.getUserInformation().getEmail())) {
-                return true;
-            }
-        }
-        return getOwner().getUserInformation().getEmail().equals(user.getUserInformation().getEmail());
-    }
-
-    public boolean hasAuthorityToDeleteCard(final User user, final Card card) {
+    /**
+     * Check if given user has the authority to delete one of the account's card
+     * @param user Given user details
+     * @return True or false if user has the authority to delete card or not
+     */
+    public boolean hasAuthorityToDeleteCard(final User user) {
         if (getType().equals("business")) {
-            return foundUserInBusinessAccount(user);
+            return getUserPosition(user.getUserInformation().getEmail()).isEmpty();
         }
         //Classic account
-        return getOwner().getUserInformation().getEmail().equals(user.getUserInformation().getEmail());
+        return getOwner().getUserInformation().getEmail().
+                equals(user.getUserInformation().getEmail());
+    }
+
+    /**
+     * Generates a new card of type One Time and deletes the previously used one
+     * @param oldCard Card that needs to be deleted
+     * @param handler Command data for creating Json format transaction output
+     */
+    public void generateNewOneTimeCard(final Card oldCard, final CommandHandler handler) {
+        Card newCard = new Card.Builder(this).oneTime().build();
+        this.addCard(newCard);
+
+        handler.addTransactions(getOwner(), this, oldCard.cardDestroyedJson(handler));
+        handler.addTransactions(getOwner(), this, newCard.cardCreatedJson(handler));
+        getCards().remove(oldCard);
+
     }
 }

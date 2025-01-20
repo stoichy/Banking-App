@@ -28,7 +28,7 @@ public final class SetterCommandVisitor implements CommandVisitorInterface {
             return handler.notSavingsAccountErrorJson();
         }
 
-        handler.addTransactions(user, account, changedInterestTransactionJson(handler.getCommand()));
+        handler.addTransactions(user, account, changeInterestTransactionJson(handler.getCommand()));
 
         return null;
     }
@@ -71,9 +71,10 @@ public final class SetterCommandVisitor implements CommandVisitorInterface {
      * @param command Command data
      * @return Transaction details in Json format encapsulated in ObjectNode
      */
-    public ObjectNode changedInterestTransactionJson(final CommandInput command) {
+    public ObjectNode changeInterestTransactionJson(final CommandInput command) {
         ObjectNode output = new ObjectMapper().createObjectNode();
-        output.put("description", "Interest rate of the account changed to " + command.getInterestRate());
+        output.put("description", "Interest rate of the account changed to "
+                + command.getInterestRate());
         output.put("timestamp", command.getTimestamp());
         return output;
     }

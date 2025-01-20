@@ -17,23 +17,57 @@ import java.util.List;
 
 @Getter @Setter
 public final class User {
-    private UserInput userInformation;
+    private final UserInput userInformation;
     private List<Account> accounts;
     private ArrayNode transactions;
     private String plan;
     private int transactionsOver300RON;
 
-    public User(final UserInput userInformation) {
-        setUserInformation(userInformation);
-        setAccounts(new ArrayList<>());
-        setTransactions(new ObjectMapper().createArrayNode());
-        if (userInformation.getOccupation().equals("student")) {
-            setPlan("student");
-        } else {
-            setPlan("standard");
+    private User(final User.Builder builder) {
+        this.userInformation = builder.userInformation;
+        this.accounts = builder.accounts;
+        this.transactions = builder.transactions;
+        this.plan = builder.plan;
+        this.transactionsOver300RON = builder.transactionsOver300RON;
+    }
+
+    public static final class Builder {
+        private final UserInput userInformation;
+        private final List<Account> accounts;
+        private final ArrayNode transactions;
+        private final int transactionsOver300RON;
+        private String plan;
+
+        public Builder(final UserInput userInformation) {
+            this.userInformation = userInformation;
+            this.accounts = new ArrayList<>();
+            this.transactions = new ObjectMapper().createArrayNode();
+            this.transactionsOver300RON = 0;
+        }
+
+        /**
+         * Sets initial plan of user and returns class build
+         * @param userPlan Plan of user
+         * @return All Builder variables
+         */
+        public User.Builder plan(final String userPlan) {
+            this.plan = userPlan;
+            return this;
+        }
+
+        /**
+         * Creates new User class instance with given parameters
+         * @return New User instance
+         */
+        public User build() {
+            return new User(this);
         }
     }
 
+    /**
+     * Returns age of user based on his birthdate from its information field
+     * @return Age of user as an integer
+     */
     public int getAge() {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         LocalDate birthDate = LocalDate.parse(getUserInformation().getBirthDate(), formatter);
@@ -58,6 +92,10 @@ public final class User {
      */
     public void addTransaction(final ObjectNode transaction) {
         getTransactions().add(transaction);
+    }
+
+    public ArrayNode getCopyTransactions() {
+        return transactions.deepCopy();
     }
 
     /**

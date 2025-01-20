@@ -76,6 +76,10 @@ public abstract class CommandHandler {
         return error;
     }
 
+    /**
+     * Generates Object Node for command error
+     * @return Json format output with error details
+     */
     public ObjectNode userNotFoundJson() {
         ObjectNode error = getJsonWithHeader(getCommand());
         ObjectNode output = new ObjectMapper().createObjectNode();
@@ -87,8 +91,8 @@ public abstract class CommandHandler {
     }
 
     /**
-     * Creates error regarding card search in Json format
-     * @return ObjectNode with command parameters and error output
+     * Generates Object Node error containing card search details in Json format
+     * @return Json format details with command parameters and error output
      */
     public ObjectNode cardNotFoundJson() {
         ObjectNode error = getJsonWithHeader(getCommand());
@@ -100,8 +104,15 @@ public abstract class CommandHandler {
         return error;
     }
 
-    public ObjectNode planUpgradeSuccessfulJson
-            (String newPlan, String accountNumber, int timestamp) {
+    /**
+     * Generates Object Node containing details for the plan upgrade command success
+     * @param newPlan New plan type for account
+     * @param accountNumber Account IBAN
+     * @param timestamp Timestamp for the execution of command
+     * @return Json format output with command details
+     */
+    public ObjectNode planUpgradeSuccessfulJson(
+            final String newPlan, final String accountNumber, final int timestamp) {
         ObjectNode output = new ObjectMapper().createObjectNode();
         output.put("description", "Upgrade plan");
         output.put("accountIBAN", accountNumber);

@@ -10,12 +10,27 @@ import org.poo.main.Card;
 import org.poo.main.User;
 
 public final class WithdrawCommandVisitor implements CommandVisitorInterface {
+    private static final int MINIMUM_AGE_FOR_SAVINGS_WITHDRAW = 21;
+    private static final int GOLD_FROM_SILVER_PLAN_UPGRADE_PRICE = 250;
+    private static final int GOLD_FROM_STANDARD_PLAN_UPGRADE_PRICE = 350;
+    private static final int SILVER_PLAN_UPGRADE_PRICE = 100;
 
+    /**
+     * Method used to implement visitor interface
+     * @param bank Bard data
+     * @param handler Command data
+     * @return Null, no output is needed
+     */
     public ObjectNode visit(final Bank bank, final CommandHandler handler) {
         return null;
     }
 
-    //Withdraw savings
+    /**
+     * Withdraw user savings to classic account if possible, otherwise store given error
+     * @param user User data
+     * @param handler Command data
+     * @return Null, no output is needed
+     */
     public ObjectNode visit(final User user, final CommandHandler handler) {
         Bank bankData = handler.getBank();
         CommandInput commandData = handler.getCommand();
@@ -23,13 +38,8 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
         Account senderAccount = bankData.searchAccount(commandData.getAccount());
         Account receiverAccount = searchFirstAccountByCurrency(commandData.getCurrency(), user);
         double amount;
-        if (user.getAge() < 21) {
+        if (user.getAge() < MINIMUM_AGE_FOR_SAVINGS_WITHDRAW) {
             user.addTransaction(minimumAgeErrorJson(handler));
-            return null;
-        }
-
-        if (senderAccount == null) {
-            //TODO account not found error
             return null;
         }
 
@@ -39,10 +49,7 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
             return null;
         }
 
-        if (!senderAccount.getType().equals("savings")) {
-            //TODO account is not savings account error
-            return null;
-        }
+
         if (senderAccount.getCurrency().equals(receiverAccount.getCurrency())) {
             amount = commandData.getAmount();
         } else {
@@ -51,118 +58,100 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
         }
 
         if (senderAccount.getBalance() < amount) {
-            //TODO funds not sufficient error
             return null;
         }
 
         receiverAccount.setBalance(receiverAccount.getBalance() + commandData.getAmount());
         senderAccount.setBalance(senderAccount.getBalance() - amount);
-        user.addTransaction(savingsWithdrawalSuccessJson
-                (commandData,  senderAccount.getNumber(), receiverAccount.getNumber()));
-        user.addTransaction(savingsWithdrawalSuccessJson
-                (commandData,  senderAccount.getNumber(), receiverAccount.getNumber()));
+        user.addTransaction(savingsWithdrawalSuccessJson(
+                commandData,  senderAccount.getNumber(), receiverAccount.getNumber()));
+        user.addTransaction(savingsWithdrawalSuccessJson(
+                commandData,  senderAccount.getNumber(), receiverAccount.getNumber()));
 
         return null;
     }
 
-    //Upgrade plan
+    /**
+     * Upgrades user plan if possible, otherwise store given error
+     * @param account Account data
+     * @param handler Command data
+     * @return Null, no output is needed
+     */
     public ObjectNode visit(final Account account, final CommandHandler handler) {
-        User user = handler.getBank().searchUserByAccount(handler.getCommand().getAccount());
-        String upgradePlan = handler.getCommand().getNewPlanType();
+        CommandInput commandData = handler.getCommand();
+        User user = handler.getBank().searchUserByAccount(commandData.getAccount());
+        String upgradePlan = commandData.getNewPlanType();
+        String currentPlan = user.getPlan();
+        double exchangedPrice;
 
-        if (user.getPlan().equals(upgradePlan)) {
+        if (currentPlan.equals(upgradePlan)) {
             user.addTransaction(userAlreadyHasPlanErrorJson(handler));
             account.addTransaction(userAlreadyHasPlanErrorJson(handler));
             return null;
         }
 
-        if (user.getPlan().equals("silver") &&
-                (upgradePlan.equals("student") || upgradePlan.equals("standard"))) {
-            //TODO can't downgrade plan error
+        if (currentPlan.equals("silver") && (upgradePlan.equals("student")
+                || upgradePlan.equals("standard"))) {
             return null;
         }
 
-        if (user.getPlan().equals("gold") &&
-                (upgradePlan.equals("student") ||
-                upgradePlan.equals("standard") ||
-                upgradePlan.equals("silver"))) {
-            //TODO can t downgrade plan error
+        if (currentPlan.equals("gold") && (upgradePlan.equals("student")
+                || upgradePlan.equals("standard") || upgradePlan.equals("silver"))) {
             return null;
         }
 
-        if (handler.getCommand().getNewPlanType().equals("gold") &&
-                (user.getPlan().equals("standard") || user.getPlan().equals("student"))) {
-            if (account.getCurrency().equals("RON")) {
-                if (account.getBalance() >= 350) {
-                    //TODO add transaction to user and take fee from account balance
-                    user.setPlan("gold");
-                    account.setBalance(account.getBalance() - 350);
-                } else {
-                    //TODO insufficient funds error
-                    return null;
-                }
+        if (upgradePlan.equals("gold") && (currentPlan.equals("standard")
+                || currentPlan.equals("student"))) {
+            exchangedPrice = handler.getBank().exchange(account.getCurrency(),
+                    "RON", GOLD_FROM_STANDARD_PLAN_UPGRADE_PRICE);
+            if (account.getBalance() >= exchangedPrice) {
+                user.setPlan("gold");
+                account.setBalance(account.getBalance() - exchangedPrice);
             } else {
-                if (account.getBalance() >= handler.getBank().exchange(account.getCurrency(), "RON", 350)) {
-                    user.setPlan("gold");
-                    double amountToDeduct = handler.getBank().exchange(account.getCurrency(), "RON", 350);
-                    account.setBalance(account.getBalance() - amountToDeduct);
-                } else {
-                    //TODO insufficient funds error
-                    return null;
-                }
+                handler.addTransactions(user, account,
+                        account.insufficientFundsJson(commandData.getTimestamp()));
+                return null;
             }
         }
 
-        if (handler.getCommand().getNewPlanType().equals("gold") && user.getPlan().equals("silver")) {
-            if (account.getCurrency().equals("RON")) {
-                if (account.getBalance() >= 250) {
-                    //TODO add transaction to user and take fee from account balance
-                    user.setPlan("gold");
-                    account.setBalance(account.getBalance() - 250);
-                } else {
-                    //TODO insufficient funds error
-                    return null;
-                }
+        if (upgradePlan.equals("gold") && currentPlan.equals("silver")) {
+            exchangedPrice = handler.getBank().exchange(account.getCurrency(),
+                    "RON", GOLD_FROM_SILVER_PLAN_UPGRADE_PRICE);
+            if (account.getBalance() >= exchangedPrice) {
+                user.setPlan("gold");
+                account.setBalance(account.getBalance() - exchangedPrice);
             } else {
-                if (account.getBalance() >= handler.getBank().exchange(account.getCurrency(), "RON", 250)) {
-                    user.setPlan("gold");
-                    double amountToDeduct = handler.getBank().exchange(account.getCurrency(), "RON", 250);
-                    account.setBalance(account.getBalance() - amountToDeduct);
-                } else {
-                    //TODO insufficient funds error
-                    return null;
-                }
+                handler.addTransactions(user, account,
+                        account.insufficientFundsJson(commandData.getTimestamp()));
+                return null;
             }
         }
 
-        //Insufficient funds error
-        if (handler.getCommand().getNewPlanType().equals("silver")) {
-            if (account.getCurrency().equals("RON")) {
-                if (account.getBalance() >= 100) {
-                    account.addTransaction(handler.planUpgradeSuccessfulJson(upgradePlan, account.getNumber(), handler.getCommand().getTimestamp()));
-                    user.setPlan("silver");
-                    account.setBalance(account.getBalance() - 100);
-                } else {
-                    handler.addTransactions(user, account, account.insufficientFundsJson(handler.getCommand().getTimestamp()));
-                    return null;
-                }
+        if (upgradePlan.equals("silver")) {
+            exchangedPrice = handler.getBank().exchange(account.getCurrency(),
+                    "RON", SILVER_PLAN_UPGRADE_PRICE);
+            if (account.getBalance() >= exchangedPrice) {
+                user.setPlan("silver");
+                account.setBalance(account.getBalance() - exchangedPrice);
             } else {
-                if (account.getBalance() >= handler.getBank().exchange(account.getCurrency(), "RON", 100)) {
-                    user.setPlan("silver");
-                    double amountToDeduct = handler.getBank().exchange(account.getCurrency(), "RON", 100);
-                    account.setBalance(account.getBalance() - amountToDeduct);
-                } else {
-                    handler.addTransactions(user, account, account.insufficientFundsJson(handler.getCommand().getTimestamp()));
-                    return null;
-                }
+                handler.addTransactions(user, account,
+                        account.insufficientFundsJson(commandData.getTimestamp()));
+                return null;
             }
         }
 
-        user.addTransaction(handler.planUpgradeSuccessfulJson(upgradePlan, account.getNumber(), handler.getCommand().getTimestamp()));
+        account.addTransaction(handler.planUpgradeSuccessfulJson(
+                upgradePlan, account.getNumber(), commandData.getTimestamp()));
+        user.addTransaction(handler.planUpgradeSuccessfulJson(
+                upgradePlan, account.getNumber(), commandData.getTimestamp()));
         return null;
     }
 
-    //Cash withdrawal
+    /** Withdraws cash from account if possible, otherwise store given error
+     * @param card Card data
+     * @param handler Command data
+     * @return Null, no output is needed
+     */
     public ObjectNode visit(final Card card, final CommandHandler handler) {
         Account account = handler.getBank().searchAccountByCard(card.getNumber());
         Bank bankData = handler.getBank();
@@ -171,69 +160,41 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
 
         User user = handler.getBank().searchUserByAccount(account.getNumber());
 
-        if (bankData.searchUser(handler.getCommand().getEmail()) == null) {
+        if (bankData.searchUser(commandData.getEmail()) == null) {
             return handler.userNotFoundJson();
         }
 
-        if (card.getFrozen()) {
-            handler.addTransactions(user, account, card.isFrozenJson(commandData.getTimestamp()));
-            return null;
-        }
+        comissionPlusAmount = bankData.exchange(account.getCurrency(), "RON",
+                bankData.getCommission(account, commandData.getAmount()));
 
-        if (account.getCurrency().equals("RON")) {
-            comissionPlusAmount = bankData.getCommission(account, commandData.getAmount());
-        } else {
-            comissionPlusAmount = bankData.exchange(account.getCurrency(),
-                    "RON", bankData.getCommission(account, commandData.getAmount()));
-        }
-
-        if (account.getType().equals("business")) {
-            String email = user.getUserInformation().getEmail();
-            if (account.getUserPosition(email).isEmpty()) {
+        if (!account.getOwner().getUserInformation().getEmail().equals(commandData.getEmail())) {
                 return handler.cardNotFoundJson();
-            }
-            if (account.getUserPosition(email).equals("employee")) {
-                if (comissionPlusAmount > account.getSpendingLimit()) {
-                    return null;
-                }
-            }
-            if (!account.getUserPosition(email).equals("owner")) {
-                account.getExpenses().add
-                        (new Object[]{email, handler.getCommand().getAmount(),
-                                commandData.getCommerciant()});
-            }
-        } else {
-            if (!account.getOwner().getUserInformation().getEmail().equals(handler.getCommand().getEmail())) {
-                return handler.cardNotFoundJson();
-            }
         }
 
         //Check if account has sufficient funds
         if (account.getBalance() < comissionPlusAmount) {
-            handler.addTransactions(user, account, account.insufficientFundsJson(commandData.getTimestamp()));
+            handler.addTransactions(
+                    user, account, account.insufficientFundsJson(commandData.getTimestamp()));
             return null;
         }
 
-//        if (commandData.getTimestamp() >= 284 && commandData.getTimestamp() <= 293) {
-//            System.out.println("Timestamp: " + commandData.getTimestamp() +
-//                    account.getType() + " " + account.getNumber());
-//        }
         account.setBalance(account.getBalance() - comissionPlusAmount);
 
-        handler.addTransactions(user, account, cashWithdrawalSuccessfulJson(handler, commandData.getAmount()));
+        handler.addTransactions(
+                user, account, cashWithdrawalSuccessfulJson(handler, commandData.getAmount()));
 
         if (card.isOneTime() && account.getBalance() <= 0) {
-            Card newCard = new Card.Builder(account).oneTime().build();
-            account.addCard(newCard);
-
-            handler.addTransactions(user, account, card.cardDestroyedJson(handler));
-            handler.addTransactions(user, account, newCard.cardCreatedJson(handler));
-            account.getCards().remove(card);
+            account.generateNewOneTimeCard(card, handler);
         }
 
         return null;
     }
 
+    /** Searches from the given user account list the first account with the given currency
+     * @param currency Currency of account to be searched
+     * @param user User data
+     * @return The first account with the given currency, null if none is found
+     */
     public Account searchFirstAccountByCurrency(final String currency, final User user) {
         for (Account account : user.getAccounts()) {
             if (account.getCurrency().equals(currency) && account.getType().equals("classic")) {
@@ -243,8 +204,13 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
         return null;
     }
 
-    public ObjectNode cashWithdrawalSuccessfulJson
-            (final CommandHandler handler, final double amount) {
+    /** Generates Object Node storing successful plan upgrade transaction
+     * @param handler Command data
+     * @param amount Amount of cash withdrawn
+     * @return Json format output for successful plan upgrade
+     */
+    public ObjectNode cashWithdrawalSuccessfulJson(
+            final CommandHandler handler, final double amount) {
         ObjectNode output = new ObjectMapper().createObjectNode();
         output.put("timestamp", handler.getCommand().getTimestamp());
         output.put("description", "Cash withdrawal of " + amount);
@@ -252,14 +218,26 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
         return output;
     }
 
-    public ObjectNode userAlreadyHasPlanErrorJson (final CommandHandler handler) {
+    /** Generates Object Node for failing to upgrade plan
+     * @param handler Command data
+     * @return Json format output for upgrade plan error
+     */
+    public ObjectNode userAlreadyHasPlanErrorJson(final CommandHandler handler) {
         ObjectNode output = new ObjectMapper().createObjectNode();
-        output.put("description", "The user already has the " + handler.getCommand().getNewPlanType() + " plan.");
+        output.put("description", "The user already has the "
+                + handler.getCommand().getNewPlanType() + " plan.");
         output.put("timestamp", handler.getCommand().getTimestamp());
         return output;
     }
 
-    public ObjectNode savingsWithdrawalSuccessJson(final CommandInput command, final String senderAccount, final String receiverAccount) {
+    /** Generates Object Node for successful cash withdrawal
+     * @param command Command data
+     * @param senderAccount Sender account data
+     * @param receiverAccount Receiver account data
+     * @return Json format output for successful cash withdrawal
+     */
+    public ObjectNode savingsWithdrawalSuccessJson(
+            final CommandInput command, final String senderAccount, final String receiverAccount) {
         ObjectNode output = new ObjectMapper().createObjectNode();
         output.put("amount", command.getAmount());
         output.put("classicAccountIBAN", receiverAccount);
@@ -269,6 +247,11 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
         return output;
     }
 
+    /** Generates Object Node for failing to withdraw savings from account,
+     * because user does not have the required minimum age
+     * @param handler Command data
+     * @return Json format output for cash withdrawal error
+     */
     public ObjectNode minimumAgeErrorJson(final CommandHandler handler) {
         ObjectNode output = new ObjectMapper().createObjectNode();
         output.put("description", "You don't have the minimum age required.");
@@ -276,6 +259,11 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
         return output;
     }
 
+    /** Generates Object Node for failing to withdraw savings from account,
+     * because user has no classic account
+     * @param handler Command data
+     * @return Json format output for cash withdrawal error
+     */
     public ObjectNode noClassicAccountJson(final CommandHandler handler) {
         ObjectNode json = new ObjectMapper().createObjectNode();
         json.put("description", "You do not have a classic account.");
