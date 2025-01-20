@@ -19,16 +19,9 @@ public class SplitPayment {
     private String type;
     private boolean accepted;
     private int timestamp;
-    public SplitPayment
-            (final User user,
-             final Account account,
-             final double totalAmount,
-             final double paymentAmount,
-             final List<String> accounts,
-             final List<Double> amounts,
-             final String currency,
-             final String splitPaymentCurrency,
-             final String type,
+    public SplitPayment(final User user, final Account account, final double totalAmount,
+             final double paymentAmount, final List<String> accounts, final List<Double> amounts,
+             final String currency, final String splitPaymentCurrency, final String type,
              final int timestamp) {
         this.user = user;
         this.account = account;

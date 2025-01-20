@@ -58,6 +58,7 @@ public final class Card {
         return visitor.visit(this, cardCommandHandler);
     }
 
+
     public boolean getFrozen() {
         return frozen;
     }

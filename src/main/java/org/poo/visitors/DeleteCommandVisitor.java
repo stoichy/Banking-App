@@ -61,11 +61,16 @@ public final class DeleteCommandVisitor implements CommandVisitorInterface {
         Account account = card.getAccount();
         User user = account.getOwner();
 
-        handler.addTransactions(user,
-                                account,
-                                card.cardDeletedJson(handler.getCommand().getTimestamp()));
+        if (account.hasAuthorityToDeleteCard
+                (handler.getBank().searchUser(handler.getCommand().getEmail()), card)) {
 
-        account.getCards().remove(card);
+            if (account.getBalance() == 0) {
+                account.getCards().remove(card);
+                handler.addTransactions(user,
+                        account,
+                        card.cardDeletedJson(handler.getCommand().getTimestamp()));
+            }
+        }
 
         return null;
     }

@@ -12,6 +12,7 @@ import org.poo.main.User;
 import java.util.*;
 
 public final class BusinessCommandVisitor implements CommandVisitorInterface {
+
     //Business report
     public ObjectNode visit(final Bank bank, final CommandHandler handler) {
         Account account = bank.searchAccount(handler.getCommand().getAccount());
@@ -39,8 +40,8 @@ public final class BusinessCommandVisitor implements CommandVisitorInterface {
                     }
                     if (!found) {
                         commerciantsExpenses.add(new Object[]{commerciant, 0.0, null, null});
-                        ArrayNode managers = new ArrayNode(new ObjectMapper().getNodeFactory());
-                        ArrayNode employees = new ArrayNode(new ObjectMapper().getNodeFactory());
+                        ArrayList<String> managers = new ArrayList<>();
+                        ArrayList<String> employees = new ArrayList<>();
                         for (Object[] pair2 : account.getExpenses()) {
                             if (commerciant.equals(pair2[2])) {
                                 double amount = (double) pair2[1];
@@ -48,15 +49,11 @@ public final class BusinessCommandVisitor implements CommandVisitorInterface {
                                 String email = (String) pair2[0];
                                 User user = bank.searchUser(email);
                                 if (account.getUserPosition(email).equals("manager")) {
-                                    ObjectNode managerNode = new ObjectMapper().createObjectNode();
-                                    managerNode.put("username", user.getUserInformation().getLastName() + " " +
+                                    managers.add(user.getUserInformation().getLastName() + " " +
                                             user.getUserInformation().getFirstName());
-                                    managers.add(managerNode);
                                 } else {
-                                    ObjectNode employeeNode = new ObjectMapper().createObjectNode();
-                                    employeeNode.put("username", user.getUserInformation().getLastName() + " " +
+                                    employees.add(user.getUserInformation().getLastName() + " " +
                                             user.getUserInformation().getFirstName());
-                                    employees.add(employeeNode);
                                 }
                             }
                         }
@@ -134,9 +131,11 @@ public final class BusinessCommandVisitor implements CommandVisitorInterface {
     //Add business associate
     public ObjectNode visit(final User user, final CommandHandler handler) {
         Account account = handler.getBank().searchAccount(handler.getCommand().getAccount());
-        if (account == null) {
+
+        if (account != null && account.foundUserInBusinessAccount(user)) {
             return null;
         }
+
         if (handler.getCommand().getRole().equals("employee")) {
             account.addEmployee(user);
         } else {
@@ -150,6 +149,9 @@ public final class BusinessCommandVisitor implements CommandVisitorInterface {
         if (!handler.getCommand().getEmail().equals
                 (account.getOwner().getUserInformation().getEmail())) {
             return userIsNotOwnerJson(handler);
+        }
+        if (!account.getType().equals("business")) {
+            return notBusinessAccountJson(handler);
         }
         if (handler.getCommand().getCommand().equals("changeSpendingLimit")) {
             account.setSpendingLimit(handler.getCommand().getAmount());
@@ -168,12 +170,13 @@ public final class BusinessCommandVisitor implements CommandVisitorInterface {
         ObjectNode output = new ObjectMapper().createObjectNode();
         output.put("balance", account.getBalance());
         ArrayNode commerciantsExpensesJson = new ObjectMapper().createArrayNode();
+        commerciantsExpenses.sort(Comparator.comparing(pair -> (String) pair[0]));
         for (Object[] pair : commerciantsExpenses) {
             ObjectNode commerciantNode = new ObjectMapper().createObjectNode();
             commerciantNode.put("commerciant", (String) pair[0]);
-            commerciantNode.put("total spent", (double) pair[1]);
-            commerciantNode.set("managers", (ArrayNode) pair[2]);
-            commerciantNode.set("employees", (ArrayNode) pair[3]);
+            commerciantNode.put("total received", (double) pair[1]);
+            commerciantNode.set("managers", new ObjectMapper().valueToTree(pair[2]));
+            commerciantNode.set("employees", new ObjectMapper().valueToTree(pair[3]));
             commerciantsExpensesJson.add(commerciantNode);
         }
         output.set("commerciants",  commerciantsExpensesJson);
@@ -209,7 +212,22 @@ public final class BusinessCommandVisitor implements CommandVisitorInterface {
     public ObjectNode userIsNotOwnerJson(CommandHandler handler) {
         ObjectNode commandJson = handler.getJsonWithHeader(handler.getCommand());
         ObjectNode output = new ObjectMapper().createObjectNode();
-        output.put("description", "You must be owner in order to change spending limit.");
+
+        if (handler.getCommand().getCommand().equals("changeSpendingLimit")) {
+            output.put("description", "You must be owner in order to change spending limit.");
+        } else if (handler.getCommand().getCommand().equals("changeDepositLimit")) {
+            output.put("description", "You must be owner in order to change deposit limit.");
+        }
+        output.put("timestamp", handler.getCommand().getTimestamp());
+        commandJson.set("output", output);
+        commandJson.put("timestamp", handler.getCommand().getTimestamp());
+        return commandJson;
+    }
+
+    public ObjectNode notBusinessAccountJson(CommandHandler handler) {
+        ObjectNode commandJson = handler.getJsonWithHeader(handler.getCommand());
+        ObjectNode output = new ObjectMapper().createObjectNode();
+        output.put("description", "This is not a business account");
         output.put("timestamp", handler.getCommand().getTimestamp());
         commandJson.set("output", output);
         commandJson.put("timestamp", handler.getCommand().getTimestamp());

@@ -28,19 +28,20 @@ public class Account {
     private double cashbackForFood;
     private double cashbackForTech;
     private double spendingThreshold;
-    private double spendingLimit; //Business
-    private double depositLimit; //Business
+    private double spendingLimit;
+    private double depositLimit;
     private String number;
     private String currency;
     private String type;
     private String alias;
-    private List<User> employees; //Business
-    private List<User> managers; //Business
+    private List<User> employees;
+    private List<User> managers;
     private List<Card> cards;
-    private List<Object[]> deposits; //Business
-    private List<Object[]> expenses; //Business
+    private List<Object[]> deposits;
+    private List<Object[]> expenses;
     private ArrayNode transactions;
     private User owner;
+    private ArrayList<Commerciant> commerciants;
 
     private Account(final Builder builder) {
         setNumber(builder.number);
@@ -55,6 +56,7 @@ public class Account {
         setInterestRate(builder.interestRate);
         setDeposits(builder.deposits);
         setExpenses(builder.expenses);
+        setCommerciants(builder.commerciants);
     }
 
     public static class Builder {
@@ -66,8 +68,9 @@ public class Account {
         private final ArrayNode transactions;
         private final double minimumBalance;
         private final User owner;
-        private List<Object[]> deposits;
-        private List<Object[]> expenses;
+        private final ArrayList<Commerciant> commerciants;
+        private final List<Object[]> deposits;
+        private final List<Object[]> expenses;
         private double interestRate = 0;
         private String type = "";
 
@@ -82,6 +85,7 @@ public class Account {
             this.owner = owner;
             this.deposits = new ArrayList<>();
             this.expenses = new ArrayList<>();
+            this.commerciants = new ArrayList<>();
         }
 
         public Builder type(final String type) {
@@ -102,16 +106,16 @@ public class Account {
     /**
      * Accepts visitor class for running command and command handler class to store command data
      * @param visitor Visitor class that implements the command processing logic
-     * @param accountCommandHandler The handler containing command data
+     * @param handler The handler containing bank and command data
      * @return Result of the visit method call, encapsulated in an ObjectNode
      */
-    public ObjectNode accept(final CommandVisitorInterface visitor,
-                             final CommandHandler accountCommandHandler) {
-        return visitor.visit(this, accountCommandHandler);
+    public ObjectNode accept(final CommandVisitorInterface visitor, final CommandHandler handler) {
+        return visitor.visit(this, handler);
     }
 
     /**
      * Adds card to account cards list
+     *
      * @param card Card to be added
      */
     public void addCard(final Card card) {
@@ -120,6 +124,7 @@ public class Account {
 
     /**
      * Adds transaction to account transactions list
+     *
      * @param transaction Transaction to be added
      */
     public void addTransaction(final ObjectNode transaction) {
@@ -128,6 +133,7 @@ public class Account {
 
     /**
      * Convert account details to Json format
+     *
      * @return ObjectNode that encapsulates account data
      */
     public ObjectNode toJson() {
@@ -142,6 +148,7 @@ public class Account {
 
     /**
      * Converts all account's cards details to Json format
+     *
      * @return ObjectNode that encapsulates cards data
      */
     public ArrayNode cardsToJson() {
@@ -154,6 +161,7 @@ public class Account {
 
     /**
      * Creates error in Json format for not having enough funds in account balance
+     *
      * @param timestamp Command execution timestamp
      * @return ObjectNode that encapsulates error details
      */
@@ -166,6 +174,7 @@ public class Account {
 
     /**
      * Account creation transaction in Json format
+     *
      * @param timestamp Command execution timestamp
      * @return ObjectNode that encapsulates transaction details
      */
@@ -178,6 +187,7 @@ public class Account {
 
     /**
      * Creates error for failing account deletion in Json format
+     *
      * @param handler Command data
      * @return ObjectNode that encapsulates error details
      */
@@ -195,6 +205,7 @@ public class Account {
 
     /**
      * Creates transaction for account deletion success in Json format
+     *
      * @param handler Command data
      * @return ObjectNode that encapsulates transaction details
      */
@@ -211,6 +222,7 @@ public class Account {
 
     /**
      * Creates error for failing account deletion for transaction output
+     *
      * @param timestamp Command execution timestamp
      * @return ObjectNode that encapsulates transaction details
      */
@@ -224,6 +236,7 @@ public class Account {
 
     /**
      * Creates report for all account transfers, payments and errors in transactions
+     *
      * @param handler Command data
      * @return ObjectNode that encapsulates all account transactions
      */
@@ -253,6 +266,7 @@ public class Account {
 
     /**
      * Creates report for all account payments to commerciants
+     *
      * @param handler Command data
      * @return ObjectNode that encapsulates all account payments
      */
@@ -312,7 +326,7 @@ public class Account {
         getManagers().add(user);
     }
 
-    public String getUserPosition (final String email) {
+    public String getUserPosition(final String email) {
         if (getOwner().getUserInformation().getEmail().equals(email)) {
             return "owner";
         }
@@ -329,4 +343,34 @@ public class Account {
         return "";
     }
 
+    public Commerciant searchCommerciant(final String commerciantName) {
+        for (Commerciant commerciant : getCommerciants()) {
+            if (commerciant.getCommerciant().getCommerciant().equals(commerciantName)) {
+                return commerciant;
+            }
+        }
+        return null;
+    }
+
+    public boolean foundUserInBusinessAccount(final User user) {
+        for (User manager : getManagers()) {
+            if (manager.getUserInformation().getEmail().equals(user.getUserInformation().getEmail())) {
+                return true;
+            }
+        }
+        for (User employee : getEmployees()) {
+            if (employee.getUserInformation().getEmail().equals(user.getUserInformation().getEmail())) {
+                return true;
+            }
+        }
+        return getOwner().getUserInformation().getEmail().equals(user.getUserInformation().getEmail());
+    }
+
+    public boolean hasAuthorityToDeleteCard(final User user, final Card card) {
+        if (getType().equals("business")) {
+            return foundUserInBusinessAccount(user);
+        }
+        //Classic account
+        return getOwner().getUserInformation().getEmail().equals(user.getUserInformation().getEmail());
+    }
 }

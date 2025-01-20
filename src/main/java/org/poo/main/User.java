@@ -21,6 +21,7 @@ public final class User {
     private List<Account> accounts;
     private ArrayNode transactions;
     private String plan;
+    private int transactionsOver300RON;
 
     public User(final UserInput userInformation) {
         setUserInformation(userInformation);
@@ -57,10 +58,6 @@ public final class User {
      */
     public void addTransaction(final ObjectNode transaction) {
         getTransactions().add(transaction);
-    }
-
-    public ArrayNode getCopyTransactions() {
-        return transactions.deepCopy();
     }
 
     /**

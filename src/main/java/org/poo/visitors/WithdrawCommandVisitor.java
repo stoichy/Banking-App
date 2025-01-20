@@ -139,8 +139,7 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
         if (handler.getCommand().getNewPlanType().equals("silver")) {
             if (account.getCurrency().equals("RON")) {
                 if (account.getBalance() >= 100) {
-                    //TODO add transaction to user and take fee from account balance
-                    account.addTransaction(planUpgradeSuccessfulJson(upgradePlan, account.getNumber(), handler.getCommand().getTimestamp()));
+                    account.addTransaction(handler.planUpgradeSuccessfulJson(upgradePlan, account.getNumber(), handler.getCommand().getTimestamp()));
                     user.setPlan("silver");
                     account.setBalance(account.getBalance() - 100);
                 } else {
@@ -159,7 +158,7 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
             }
         }
 
-        user.addTransaction(planUpgradeSuccessfulJson(upgradePlan, account.getNumber(), handler.getCommand().getTimestamp()));
+        user.addTransaction(handler.planUpgradeSuccessfulJson(upgradePlan, account.getNumber(), handler.getCommand().getTimestamp()));
         return null;
     }
 
@@ -168,38 +167,69 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
         Account account = handler.getBank().searchAccountByCard(card.getNumber());
         Bank bankData = handler.getBank();
         CommandInput commandData = handler.getCommand();
-        double amount;
-
-        if (account == null) {
-            //TODO account not found json error
-            return null;
-        }
+        double comissionPlusAmount;
 
         User user = handler.getBank().searchUserByAccount(account.getNumber());
 
-        if (user == null || commandData.getEmail() == null) {
+        if (bankData.searchUser(handler.getCommand().getEmail()) == null) {
             return handler.userNotFoundJson();
         }
 
+        if (card.getFrozen()) {
+            handler.addTransactions(user, account, card.isFrozenJson(commandData.getTimestamp()));
+            return null;
+        }
+
         if (account.getCurrency().equals("RON")) {
-            amount = bankData.getCommission(account, commandData.getAmount());
+            comissionPlusAmount = bankData.getCommission(account, commandData.getAmount());
         } else {
-            amount = bankData.exchange(account.getCurrency(),
+            comissionPlusAmount = bankData.exchange(account.getCurrency(),
                     "RON", bankData.getCommission(account, commandData.getAmount()));
-//            amount = handler.getBank().getCommission(account, handler.getBank().exchange
-//                            (account.getCurrency(),
-//                            "RON",
-//                            handler.getCommand().getAmount()));
+        }
+
+        if (account.getType().equals("business")) {
+            String email = user.getUserInformation().getEmail();
+            if (account.getUserPosition(email).isEmpty()) {
+                return handler.cardNotFoundJson();
+            }
+            if (account.getUserPosition(email).equals("employee")) {
+                if (comissionPlusAmount > account.getSpendingLimit()) {
+                    return null;
+                }
+            }
+            if (!account.getUserPosition(email).equals("owner")) {
+                account.getExpenses().add
+                        (new Object[]{email, handler.getCommand().getAmount(),
+                                commandData.getCommerciant()});
+            }
+        } else {
+            if (!account.getOwner().getUserInformation().getEmail().equals(handler.getCommand().getEmail())) {
+                return handler.cardNotFoundJson();
+            }
         }
 
         //Check if account has sufficient funds
-        if (account.getBalance() < commandData.getAmount()) {
+        if (account.getBalance() < comissionPlusAmount) {
             handler.addTransactions(user, account, account.insufficientFundsJson(commandData.getTimestamp()));
             return null;
         }
-        account.setBalance(account.getBalance() - amount);
+
+//        if (commandData.getTimestamp() >= 284 && commandData.getTimestamp() <= 293) {
+//            System.out.println("Timestamp: " + commandData.getTimestamp() +
+//                    account.getType() + " " + account.getNumber());
+//        }
+        account.setBalance(account.getBalance() - comissionPlusAmount);
 
         handler.addTransactions(user, account, cashWithdrawalSuccessfulJson(handler, commandData.getAmount()));
+
+        if (card.isOneTime() && account.getBalance() <= 0) {
+            Card newCard = new Card.Builder(account).oneTime().build();
+            account.addCard(newCard);
+
+            handler.addTransactions(user, account, card.cardDestroyedJson(handler));
+            handler.addTransactions(user, account, newCard.cardCreatedJson(handler));
+            account.getCards().remove(card);
+        }
 
         return null;
     }
@@ -226,15 +256,6 @@ public final class WithdrawCommandVisitor implements CommandVisitorInterface {
         ObjectNode output = new ObjectMapper().createObjectNode();
         output.put("description", "The user already has the " + handler.getCommand().getNewPlanType() + " plan.");
         output.put("timestamp", handler.getCommand().getTimestamp());
-        return output;
-    }
-    public ObjectNode planUpgradeSuccessfulJson
-            (String newPlan, String accountNumber, int timestamp) {
-        ObjectNode output = new ObjectMapper().createObjectNode();
-        output.put("description", "Upgrade plan");
-        output.put("accountIBAN", accountNumber);
-        output.put("newPlanType", newPlan);
-        output.put("timestamp", timestamp);
         return output;
     }
 

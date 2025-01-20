@@ -12,8 +12,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-
-
 public final class PaymentCommandVisitor implements CommandVisitorInterface {
 
     /**
@@ -68,18 +66,9 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
                 paymentAmount = bank.exchange(account.getCurrency(), commandCurrency, paymentAmount);
             }
 
-            bank.addSplitPaymentToList(new SplitPayment(
-                    account.getOwner(),
-                    account,
-                    totalAmount,
-                    paymentAmount,
-                    accounts,
-                    amountForUsers,
-                    account.getCurrency(),
-                    commandCurrency,
-                    splitPaymentType,
-                    commandData.getTimestamp()
-            ));
+            bank.addSplitPaymentToList(new SplitPayment(account.getOwner(), account, totalAmount,
+                    paymentAmount, accounts, amountForUsers, account.getCurrency(), commandCurrency,
+                    splitPaymentType, commandData.getTimestamp()));
         }
 
         return null;
@@ -153,18 +142,9 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
         double amount = commandData.getAmount();
         double amountPlusCommission = bankData.getCommission(senderAccount, amount);
 
-        if (!senderUser.getUserInformation().getEmail().equals(handler.getCommand().getEmail())) {
-            return null;
-        }
-
         if (receiverAccount == null) {
             if (bankData.searchCommerciantAccount(commandData.getReceiver()) == null) {
                 return handler.userNotFoundJson();
-            }
-            if (isBusinessAccount(senderAccount, senderUser, commandData)) {
-                senderAccount.getExpenses().add(new Object[]{senderUser.getUserInformation().getEmail(),
-                        commandData.getAmount(),
-                        bankData.searchCommerciantAccount(commandData.getReceiver()).getCommerciant()});
             }
             processTransaction(senderAccount, amountPlusCommission, handler, senderUser, commandData.getReceiver());
             return null;
@@ -176,9 +156,6 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
         }
 
         User receiverUser = receiverAccount.getOwner();
-        if (isBusinessAccount(senderAccount, senderUser, commandData)) {
-            return null;
-        }
 
         if (!senderAccount.getCurrency().equals(receiverAccount.getCurrency())) {
             amount = bankData.exchange(receiverAccount.getCurrency(), senderAccount.getCurrency(), amount);
@@ -188,27 +165,17 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
         handler.addTransactions(receiverUser, receiverAccount, transferReceiverJson(senderAccount.getNumber(), receiverAccount.getNumber(), receiverAccount.getCurrency(), amount, handler));
 
         receiverAccount.setBalance(receiverAccount.getBalance() + amount);
-        senderAccount.setBalance(senderAccount.getBalance() - amountPlusCommission + bankData.getCashback(senderAccount));
+        senderAccount.setBalance(senderAccount.getBalance() + bankData.getCashback(senderAccount) - amountPlusCommission);
 
         return null;
     }
 
     private void processTransaction(Account senderAccount, double amountPlusCommission, CommandHandler handler, User senderUser, String receiver) {
+        if (senderAccount.getBalance() <= amountPlusCommission) {
+            return;
+        }
         handler.addTransactions(senderUser, senderAccount, transferSenderJson(senderAccount.getNumber(), receiver, senderAccount.getCurrency(), handler));
         senderAccount.setBalance(senderAccount.getBalance() - amountPlusCommission + handler.getBank().getCashback(senderAccount));
-    }
-
-    private boolean isBusinessAccount(Account senderAccount, User senderUser, CommandInput commandData) {
-        if (senderAccount.getType().equals("business")) {
-            String userPosition = senderAccount.getUserPosition(senderUser.getUserInformation().getEmail());
-            if (userPosition.equals("employee") && commandData.getAmount() > senderAccount.getSpendingLimit()) {
-                return true;
-            }
-            if (!userPosition.equals("owner")) {
-                senderAccount.getExpenses().add(new Object[]{senderUser.getUserInformation().getEmail(), commandData.getAmount()});
-            }
-        }
-        return false;
     }
 
     /**
@@ -221,7 +188,7 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
         Bank bankData = handler.getBank();
         CommandInput commandData = handler.getCommand();
 
-        Account account = card.getAccount();
+        Account account = handler.getBank().searchAccountByCard(card.getNumber());
         User user = bankData.searchUser(commandData.getEmail());
 
         double amount = commandData.getAmount();
@@ -243,41 +210,61 @@ public final class PaymentCommandVisitor implements CommandVisitorInterface {
                     (account.getCurrency(), commandData.getCurrency(), commandData.getAmount());
         }
 
+        amountPlusCommission = bankData.getCommission(account, amount);
+        String email = user.getUserInformation().getEmail();
+
+        if (account.getType().equals("business")) {
+            if (account.getUserPosition(email).isEmpty()) {
+                return handler.cardNotFoundJson();
+            }
+            if (account.getUserPosition(email).equals("employee")) {
+                if (amountPlusCommission > account.getSpendingLimit()) {
+                    return null;
+                }
+            }
+        } else if (!account.getOwner().getUserInformation().getEmail().equals(handler.getCommand().getEmail())) {
+                return handler.cardNotFoundJson();
+        }
+
         //Check if account doesn't have enough funds to pay
-        if (account.getBalance() < amount) {
+        if (account.getBalance() < amountPlusCommission) {
             handler.addTransactions(user, account,
                     account.insufficientFundsJson(commandData.getTimestamp()));
             return null;
         }
 
-        amountPlusCommission = bankData.getCommission(account, amount);
-
-        if (account.getType().equals("business")) {
-            if ((account.getUserPosition(user.getUserInformation().getEmail()).equals("employee") &&
-                    amount > account.getSpendingLimit())) {
-                return null;
-            }
-            if (!account.getUserPosition(user.getUserInformation().getEmail()).equals("owner")) {
-                account.getExpenses().add
-                        (new Object[]{user.getUserInformation().getEmail(), amount,
-                                commandData.getCommerciant()});
-            }
+        if (account.getType().equals("business") &&
+                !account.getOwner().getUserInformation().getEmail().equals(handler.getCommand().getEmail())) {
+            account.getExpenses().add
+                    (new Object[]{email, amount,
+                            commandData.getCommerciant()});
         }
 
         handler.addTransactions(user, account, card.paymentJson(amount,
-                commandData.getCommerciant(),
-                handler));
+                commandData.getCommerciant(), handler));
 
+        double transactionAmount = bankData.exchange("RON", account.getCurrency(), amountPlusCommission);
+        if (transactionAmount >= 300) {
+            account.getOwner().setTransactionsOver300RON(user.getTransactionsOver300RON() + 1);
+        }
+        if (account.getOwner().getTransactionsOver300RON() >= 5 && account.getOwner().getPlan().equals("silver")) {
+            account.getOwner().setPlan("gold");
+            account.getOwner().addTransaction(handler.planUpgradeSuccessfulJson
+                    ("gold", account.getNumber(), commandData.getTimestamp()));
+        }
+
+        double cashback = bankData.getCashback(account);
+
+        account.setBalance(account.getBalance() + cashback);
         account.setBalance(account.getBalance() - amountPlusCommission);
-        account.setBalance(account.getBalance() + bankData.getCashback(account));
 
         if (card.isOneTime()) {
+
             Card newCard = new Card.Builder(account).oneTime().build();
             account.addCard(newCard);
 
             handler.addTransactions(user, account, card.cardDestroyedJson(handler));
             handler.addTransactions(user, account, newCard.cardCreatedJson(handler));
-
             account.getCards().remove(card);
         }
 

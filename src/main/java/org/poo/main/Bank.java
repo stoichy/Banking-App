@@ -12,7 +12,6 @@ import org.poo.visitors.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.StreamSupport;
 
 @Setter
 @Getter
@@ -133,32 +132,33 @@ public final class Bank {
         }
     }
 
-    public double getCashbackSpendingThreshold(Account account, CommerciantInput lastCommerciant, String amount) {
+    public double getCashbackSpendingThreshold(Account account, final CommerciantInput lastCommerciant, String amount) {
         User user = searchUserByAccount(account.getNumber());
-        if (user == null) {
-            return 0;
-        }
         double doubleAmount = Double.parseDouble(amount.split(" ")[0]);
-        double exchangedAmount = exchange("RON", account.getCurrency(), Double.parseDouble(amount.split(" ")[0]));
+        double exchangedAmount = account.getCurrency().equals("RON") ? doubleAmount : exchange("RON", account.getCurrency(), doubleAmount);
         account.setSpendingThreshold(account.getSpendingThreshold() + exchangedAmount);
 
-        double spendingThreshold = account.getSpendingThreshold();
-        String plan = user.getPlan();
-        double cashback = 0;
+        double cashback = switch (user.getPlan()) {
+            case "standard", "student" -> getStandardOrStudentCashback(account.getSpendingThreshold(), doubleAmount);
+            case "silver" -> getSilverCashback(account.getSpendingThreshold(), doubleAmount);
+            case "gold" -> getGoldCashback(account.getSpendingThreshold(), doubleAmount);
+            default -> 0;
+        };
 
-        if ("standard".equals(plan) || "student".equals(plan)) {
-            cashback = getStandardOrStudentCashback(spendingThreshold, doubleAmount);
-        } else if ("silver".equals(plan)) {
-            cashback = getSilverCashback(spendingThreshold, doubleAmount);
-        } else if ("gold".equals(plan)) {
-            cashback = getGoldCashback(spendingThreshold, doubleAmount);
+        double parsedAmount = Double.parseDouble(amount.split(" ")[0]);
+        String commerciantType = lastCommerciant.getType();
+        Commerciant lastCommerciantOfAccount =
+                account.searchCommerciant(lastCommerciant.getCommerciant());
+        lastCommerciantOfAccount.setTransactions(lastCommerciantOfAccount.getTransactions() + 1);
+
+        if (applyCashbackForType(account, commerciantType)) {
+            cashback += cashbackAmount(commerciantType, parsedAmount);
         }
-
         return cashback;
     }
 
     //Helper method for getCashbackSpendingThreshold
-    private double getStandardOrStudentCashback(double spendingThreshold, final double amount) {
+    private double getStandardOrStudentCashback(final double spendingThreshold, final double amount) {
         if (spendingThreshold >= 500) {
             return amount * 0.0025;
         } else if (spendingThreshold >= 300) {
@@ -170,7 +170,7 @@ public final class Bank {
     }
 
     //Helper method for getCashbackSpendingThreshold
-    private double getSilverCashback(double spendingThreshold, final double amount) {
+    private double getSilverCashback(final double spendingThreshold, final double amount) {
         if (spendingThreshold >= 500) {
             return amount * 0.005;
         } else if (spendingThreshold >= 300) {
@@ -182,7 +182,7 @@ public final class Bank {
     }
 
     //Helper method for getCashbackSpendingThreshold
-    private double getGoldCashback(double spendingThreshold, final double amount) {
+    private double getGoldCashback(final double spendingThreshold, final double amount) {
         if (spendingThreshold >= 500) {
             return amount * 0.007;
         } else if (spendingThreshold >= 300) {
@@ -197,17 +197,19 @@ public final class Bank {
         double parsedAmount = Double.parseDouble(amount.split(" ")[0]);
         String commerciantType = lastCommerciant.getType();
 
-        if (applyCashbackForType(account, commerciantType, parsedAmount)) {
+        Commerciant lastCommerciantOfAccount = account.searchCommerciant(lastCommerciant.getCommerciant());
+        lastCommerciantOfAccount.setTransactions(lastCommerciantOfAccount.getTransactions() + 1);
+
+        if (applyCashbackForType(account, commerciantType)) {
             return cashbackAmount(commerciantType, parsedAmount);
         }
-
-        updateCashbackBasedOnTransactions(account);
+        updateCashbackBasedOnTransactions(account, lastCommerciantOfAccount.getTransactions());
 
         return 0;
     }
 
     //Helper method for getCashbackNrOfTransactions
-    private boolean applyCashbackForType(Account account, String type, double amount) {
+    private boolean applyCashbackForType(Account account, String type) {
         if ("Food".equals(type) && account.getCashbackForFood() > 0) {
             account.setCashbackForFood(-1);
             return true;
@@ -234,14 +236,10 @@ public final class Bank {
     }
 
     //Helper method for getCashbackNrOfTransactions
-    private void updateCashbackBasedOnTransactions(Account account) {
-        long numberOfCommerciants = StreamSupport.stream(account.getTransactions().spliterator(), false)
-                .filter(t -> t.get("commerciant") != null)
-                .count();
-
-        if (numberOfCommerciants == 2) account.setCashbackForFood(1);
-        if (numberOfCommerciants == 5) account.setCashbackForClothes(1);
-        if (numberOfCommerciants == 10) account.setCashbackForTech(1);
+    private void updateCashbackBasedOnTransactions(Account account, int transactions) {
+        if (transactions == 2) account.setCashbackForFood(1);
+        if (transactions == 5) account.setCashbackForClothes(1);
+        if (transactions == 10) account.setCashbackForTech(1);
     }
 
     /**
@@ -342,15 +340,6 @@ public final class Bank {
         return null;
     }
 
-    public CommerciantInput searchCommerciantAccount (final String number) {
-        for (CommerciantInput commerciant : getInput().getCommerciants()) {
-            if (commerciant.getAccount().equals(number)) {
-                return commerciant;
-            }
-        }
-        return null;
-    }
-
     /**
      * Searches card by number in bank data
      * @param number Card corresponding number, stored as a string
@@ -393,6 +382,15 @@ public final class Bank {
                         return account;
                     }
                 }
+            }
+        }
+        return null;
+    }
+
+    public CommerciantInput searchCommerciantAccount (final String number) {
+        for (CommerciantInput commerciant : getInput().getCommerciants()) {
+            if (commerciant.getAccount().equals(number)) {
+                return commerciant;
             }
         }
         return null;

@@ -2,11 +2,9 @@ package org.poo.visitors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.poo.fileio.CommerciantInput;
 import org.poo.handlers.CommandHandler;
-import org.poo.main.Account;
-import org.poo.main.Bank;
-import org.poo.main.User;
-import org.poo.main.Card;
+import org.poo.main.*;
 
 import java.util.ArrayList;
 
@@ -22,13 +20,12 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
         Account account = bank.searchAccount(handler.getCommand().getAccount());
         User user = bank.searchUserByAccount(handler.getCommand().getAccount());
 
-        if (!account.getType().equals("savings")) {
+        if (account != null && !account.getType().equals("savings")) {
             return handler.notSavingsAccountErrorJson();
         }
 
         double amount = account.getInterestRate() * account.getBalance();
-        account.setBalance(account.getBalance()
-                + amount);
+        account.setBalance(account.getBalance() + amount);
 
         handler.addTransactions(user, account, interestIncomeJson(handler, account, amount));
 
@@ -67,9 +64,14 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
             }
         }
 
+        for (CommerciantInput commerciantInput : handler.getBank().getInput().getCommerciants()) {
+            Commerciant commerciant = new Commerciant();
+            commerciant.setCommerciant(commerciantInput);
+            commerciant.setTransactions(0);
+            account.getCommerciants().add(commerciant);
+        }
         user.addAccount(account);
-        handler.addTransactions(user,
-                account,
+        handler.addTransactions(user, account,
                 account.accountCreatedTransactionJson(handler.getCommand().getTimestamp()));
 
         return null;
@@ -84,6 +86,9 @@ public final class AddCommandVisitor implements CommandVisitorInterface {
     public ObjectNode visit(final Account account, final CommandHandler handler) {
         if (account.getType().equals("business")) {
             String userPosition = account.getUserPosition(handler.getCommand().getEmail());
+            if (userPosition.isEmpty()) {
+                return null;
+            }
             if (userPosition.equals("employee") && handler.getCommand().getAmount() > account.getDepositLimit()) {
                 return null;
             }

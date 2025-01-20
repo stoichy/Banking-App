@@ -37,12 +37,6 @@ public final class CreateCommandVisitor implements CommandVisitorInterface {
      */
     public ObjectNode visit(final Account account, final CommandHandler handler) {
         User accountOwner = handler.getBank().searchUserByAccount(account.getNumber());
-
-        //Given user doesn't own account
-        if (!handler.getCommand().getEmail().equals(accountOwner.getUserInformation().getEmail())) {
-            return null;
-        }
-
         Card newCard;
 
         if (handler.getCommand().getCommand().equals("createOneTimeCard")) {

@@ -30,18 +30,5 @@ public final class CardCommandHandler extends CommandHandler {
         return card.accept(visitor, this);
     }
 
-    /**
-     * Creates error regarding card search in Json format
-     * @return ObjectNode with command parameters and error output
-     */
-    public ObjectNode cardNotFoundJson() {
-        ObjectNode error = getJsonWithHeader(getCommand());
-        ObjectNode output = new ObjectMapper().createObjectNode();
-        error.set("output", output);
-        output.put("timestamp", getCommand().getTimestamp());
-        output.put("description", "Card not found");
-        error.put("timestamp", getCommand().getTimestamp());
-        return error;
-    }
 
 }
