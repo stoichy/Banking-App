@@ -1,14 +1,14 @@
-Pentru structura bancii am creat 6 clase noi ce contin toate datele acesteia, fiind organizate intr-o ierarhie.
-In clasa Bank avem o lista de useri, apoi in clasa User avem o lista de conturi, iar in clasa Account sau SavingsAccount
-avem o lista de carduri. De altfel, mai avem 2 clase ce au scopul de a stoca informatii utile pentru anumite comenzi:
+Pentru structura bancii am creat 4 clase noi ce contin toate datele acesteia, fiind organizate intr-o ierarhie.
+In clasa Bank avem o lista de useri, apoi in clasa User avem o lista de conturi, iar in clasa Account avem o lista de 
+carduri. De altfel, mai avem 2 clase ce au scopul de a stoca informatii utile pentru anumite comenzi:
 1) Commerciant: un cont stocheaza o lista de elemente Commerciant, ce contine toate datele commerciant, dar si numarul de
 tranzactii facute de un cont in legatura cu acestia. Mai exact, pentru fiecare comerciant dintr-un cont stocam numarul 
 de tranzactii catre acel comerciant de contul respectiv, ajutandu-ne altfel pentru a crea un raport al unui cont de tip
-business/
+business.
 2) SplitPayment, ce ne ajuta sa stocam datele necesare pentru mai multe split payments in derulare. Mai exact, pentru
 fiecare split payment in derulare, stocam o lista de clase SplitPayment, corespunzatoare fiecarui cont ce este implicat
 in acesta. In aceasta clasa stocam informatii esentiale pentru payment-ul pe care trebuie sa-l faca fiecare cont,
-cum ar fi suma de bani ce trebuie platita sau daca tranzactia a fost acceptata/
+cum ar fi suma de bani ce trebuie platita sau daca tranzactia a fost acceptata.
 In clasa Bank tratam fiecare tip de comanda. Pentru fiecare comanda, avem nevoie de acces doar la datele
 din ierarhia bancii (una din clasele Bank, User, Account, Card). La fiecare comanda, ne folosim de cate un handler
 specific pentru fiecare din cele 4 clase. Acesti 4 handleri mostenesc clasa principala CommandHandler, ce este folosita

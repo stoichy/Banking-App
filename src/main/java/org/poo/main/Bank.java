@@ -33,17 +33,6 @@ public final class Bank {
     private static final double SILVER_PLAN_COMMISSION = 1.001;
     private static final double STANDARD_PLAN_COMMISSION = 1.002;
     private static final int MINIMUM_AMOUNT_FOR_SILVER_PLAN_COMMISSION = 500;
-    private static final int[] MINIMUM_AMOUNTS_FOR_SPENDING_THRESHOLD_CASHBACK = {500, 300, 100};
-    private static final double[] SPENDING_THRESHOLD_CASHBACK_FOR_STANDARD_PLAN =
-            {0.0025, 0.002, 0.001};
-    private static final double[] SPENDING_THRESHOLD_CASHBACK_FOR_SILVER_PLAN =
-            {0.005, 0.004, 0.003};
-    private static final double[] SPENDING_THRESHOLD_CASHBACK_FOR_GOLD_PLAN =
-            {0.007, 0.0055, 0.005};
-    private static final double[] NUMBER_OF_TRANSACTIONS_CASHBACK_FOR_EACH_TYPE = {0.02, 0.05, 0.1};
-    private static final double[] NUMBER_OF_TRANSACTIONS_FOR_CASHBACK = {2, 5, 10};
-
-
 
     private Bank(final ObjectInput input) {
         setInput(input);
@@ -164,135 +153,13 @@ public final class Bank {
             return 0;
         }
 
+        Cashback cashback;
         if (!"spendingThreshold".equals(lastCommerciant.getCashbackStrategy())) {
-            return getCashbackNrOfTransactions(account, lastCommerciant, amount);
+            cashback = new NrOfTransactionsCashback(account, lastCommerciant, amount, this);
+            return cashback.getCashbackNrOfTransactions();
         } else {
-            return getCashbackSpendingThreshold(account, lastCommerciant, amount);
-        }
-    }
-
-    /**
-     * Calculate cashback for last transaction involving spending threshold commerciant strategy
-     * @param account Account data
-     * @param lastCommerciant Commerciant involved in last transaction
-     * @param amount Amount required for payment
-     * @return Amount of cashback given for last transaction
-     */
-    public double getCashbackSpendingThreshold(
-            final Account account, final CommerciantInput lastCommerciant, final String amount) {
-        User user = searchUserByAccount(account.getNumber());
-        double doubleAmount = Double.parseDouble(amount.split(" ")[0]);
-        double exchangedAmount = account.getCurrency().equals("RON") ? doubleAmount
-                : exchange("RON", account.getCurrency(), doubleAmount);
-        account.setSpendingThreshold(account.getSpendingThreshold() + exchangedAmount);
-
-        double cashback = switch (user.getPlan()) {
-            case "standard", "student" ->
-                    getStandardOrStudentCashback(account.getSpendingThreshold(), doubleAmount);
-            case "silver" -> getSilverCashback(account.getSpendingThreshold(), doubleAmount);
-            case "gold" -> getGoldCashback(account.getSpendingThreshold(), doubleAmount);
-            default -> 0;
-        };
-
-        double parsedAmount = Double.parseDouble(amount.split(" ")[0]);
-        String commerciantType = lastCommerciant.getType();
-        Commerciant lastCommerciantOfAccount =
-                account.searchCommerciant(lastCommerciant.getCommerciant());
-        lastCommerciantOfAccount.setTransactions(lastCommerciantOfAccount.getTransactions() + 1);
-
-        if (applyCashbackForType(account, commerciantType)) {
-            cashback += cashbackAmount(commerciantType, parsedAmount);
-        }
-        return cashback;
-    }
-
-    private double getCashback(
-            final double spendingThreshold, final double amount, final double[] cashbackRates) {
-        if (spendingThreshold >= MINIMUM_AMOUNTS_FOR_SPENDING_THRESHOLD_CASHBACK[0]) {
-            return amount * cashbackRates[0];
-        } else if (spendingThreshold >= MINIMUM_AMOUNTS_FOR_SPENDING_THRESHOLD_CASHBACK[1]) {
-            return amount * cashbackRates[1];
-        } else if (spendingThreshold >= MINIMUM_AMOUNTS_FOR_SPENDING_THRESHOLD_CASHBACK[2]) {
-            return amount * cashbackRates[2];
-        }
-        return 0;
-    }
-
-    private double getStandardOrStudentCashback(
-            final double spendingThreshold, final double amount) {
-        return getCashback(spendingThreshold, amount,
-                SPENDING_THRESHOLD_CASHBACK_FOR_STANDARD_PLAN);
-    }
-
-    private double getSilverCashback(final double spendingThreshold, final double amount) {
-        return getCashback(spendingThreshold, amount, SPENDING_THRESHOLD_CASHBACK_FOR_SILVER_PLAN);
-    }
-
-    private double getGoldCashback(final double spendingThreshold, final double amount) {
-        return getCashback(spendingThreshold, amount, SPENDING_THRESHOLD_CASHBACK_FOR_GOLD_PLAN);
-    }
-
-    /**
-     * Calculate cashback for last transaction involving number of transactions commerciant strategy
-     * @param account Account data
-     * @param lastCommerciant Commerciant involved in last transaction
-     * @param amount Amount required for payment
-     * @return Amount of cashback given for last transaction
-     */
-    public double getCashbackNrOfTransactions(
-            final Account account, final CommerciantInput lastCommerciant, final String amount) {
-        double parsedAmount = Double.parseDouble(amount.split(" ")[0]);
-        String commerciantType = lastCommerciant.getType();
-
-        Commerciant lastCommerciantOfAccount =
-                account.searchCommerciant(lastCommerciant.getCommerciant());
-        lastCommerciantOfAccount.setTransactions(lastCommerciantOfAccount.getTransactions() + 1);
-
-        if (applyCashbackForType(account, commerciantType)) {
-            return cashbackAmount(commerciantType, parsedAmount);
-        }
-        updateCashbackBasedOnTransactions(account, lastCommerciantOfAccount.getTransactions());
-
-        return 0;
-    }
-
-    //Helper method for getCashbackNrOfTransactions
-    private boolean applyCashbackForType(final Account account, final String type) {
-        if ("Food".equals(type) && account.getCashbackForFood() > 0) {
-            account.setCashbackForFood(-1);
-            return true;
-        }
-        if ("Clothes".equals(type) && account.getCashbackForClothes() > 0) {
-            account.setCashbackForClothes(-1);
-            return true;
-        }
-        if ("Tech".equals(type) && account.getCashbackForTech() > 0) {
-            account.setCashbackForTech(-1);
-            return true;
-        }
-        return false;
-    }
-
-    //Helper method for getCashbackNrOfTransactions
-    private double cashbackAmount(final String type, final double amount) {
-        return switch (type) {
-            case "Food" -> amount * NUMBER_OF_TRANSACTIONS_CASHBACK_FOR_EACH_TYPE[0];
-            case "Clothes" -> amount * NUMBER_OF_TRANSACTIONS_CASHBACK_FOR_EACH_TYPE[1];
-            case "Tech" -> amount * NUMBER_OF_TRANSACTIONS_CASHBACK_FOR_EACH_TYPE[2];
-            default -> 0;
-        };
-    }
-
-    //Helper method for getCashbackNrOfTransactions
-    private void updateCashbackBasedOnTransactions(final Account account, final int transactions) {
-        if (transactions == NUMBER_OF_TRANSACTIONS_FOR_CASHBACK[0]) {
-            account.setCashbackForFood(1);
-        }
-        if (transactions == NUMBER_OF_TRANSACTIONS_FOR_CASHBACK[1]) {
-            account.setCashbackForClothes(1);
-        }
-        if (transactions == NUMBER_OF_TRANSACTIONS_FOR_CASHBACK[2]) {
-            account.setCashbackForTech(1);
+             cashback = new SpendingThresholdCashback(account, lastCommerciant, amount, this);
+            return cashback.getCashbackSpendingThreshold();
         }
     }
 
