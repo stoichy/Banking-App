@@ -1,6 +1,8 @@
-package org.poo.main;
+package org.poo.main.cashback;
 
 import org.poo.fileio.CommerciantInput;
+import org.poo.main.Account;
+import org.poo.main.Bank;
 
 public abstract class Cashback {
     protected final Account account;

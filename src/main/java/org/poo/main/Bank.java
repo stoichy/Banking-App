@@ -16,6 +16,9 @@ import org.poo.fileio.CommerciantInput;
 import org.poo.handlers.CommandHandler;
 import org.poo.handlers.HandlerFactory;
 
+import org.poo.main.cashback.Cashback;
+import org.poo.main.cashback.NrOfTransactionsCashback;
+import org.poo.main.cashback.SpendingThresholdCashback;
 import org.poo.visitors.CommandVisitorInterface;
 import org.poo.visitors.CommandVisitorFactory;
 

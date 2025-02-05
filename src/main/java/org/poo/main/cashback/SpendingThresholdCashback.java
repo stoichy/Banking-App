@@ -1,8 +1,12 @@
-package org.poo.main;
+package org.poo.main.cashback;
 
 import lombok.Getter;
 import lombok.Setter;
 import org.poo.fileio.CommerciantInput;
+import org.poo.main.Account;
+import org.poo.main.Bank;
+import org.poo.main.Commerciant;
+import org.poo.main.User;
 
 @Getter
 @Setter
