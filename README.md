@@ -1,6 +1,6 @@
 Complex banking application built in Java, showcasing modern software design principles.
 
-Key Features :
+## Core Functionalities
 
 *   **Multiple Account Types:** Handles Classic, Savings, and Business accounts, catering to a wide range of users.
 *   **Card Management:**  Each account can manage multiple cards, including Classic and secure **One-Time Usage** cards.
