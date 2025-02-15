@@ -28,7 +28,7 @@ To run this banking application, follow these steps:
     *   **Clone the Repository:** Clone the project repository to your local machine.
     *   **Open Project:** Browse to the root directory of your cloned project (the directory containing `pom.xml`) and open it.
 
-5.  **Running the Application:**
+3.  **Running the Application:**
     *   **Entry Point:** The main application logic starts in the `action` function within the `Main` class of the project.
     *   **Execution Flow:**
         *   The application reads input data from JSON files. These files includ different types of commands that show the app functionalities.
